@@ -32,12 +32,14 @@ export async function POST(request: Request) {
     const { data: peers, error: peersError } = await supabase.from("peers").select("id").eq("room_id", roomId)
 
     if (peersError) {
-      return NextResponse.json({ success: true })
+      // Log the error but proceed. Even if peer check fails,
+      // the RLS policy below will safe-guard the delete.
+      console.error("Failed to check peers count:", peersError)
     }
 
-    // If no peers left, deactivate room
+    // If no peers left, delete the room
     if (!peers || peers.length === 0) {
-      await supabase.from("rooms").update({ is_active: false }).eq("id", roomId)
+      await supabase.from("rooms").delete().eq("id", roomId)
     }
 
     return NextResponse.json({ success: true })
