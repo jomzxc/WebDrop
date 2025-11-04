@@ -71,7 +71,7 @@ export default function LoginPage() {
 
       // OAuth redirect happens automatically, no need to manually redirect
     } catch (error: unknown) {
-      console.error("[v0] OAuth error:", error)
+      console.error("OAuth error:", error)
       setError(error instanceof Error ? error.message : "OAuth provider not enabled. Please check Supabase dashboard.")
       setIsLoading(false)
     }
