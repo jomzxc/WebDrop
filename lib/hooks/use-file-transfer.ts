@@ -165,8 +165,9 @@ export function useFileTransfer(roomId: string) {
   const handleFileComplete = useCallback(
     (fileId: string) => {
       try {
-        const blob = transferManager.current.completeTransfer(fileId)
+        // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
+        const blob = transferManager.current.completeTransfer(fileId)
 
         if (blob && metadata) {
           // Trigger download
@@ -184,6 +185,14 @@ export function useFileTransfer(roomId: string) {
           toast({
             title: "File received",
             description: `${metadata.name} downloaded successfully`,
+          })
+        } else {
+          // Add a fallback in case metadata was somehow missing
+          updateTransfer(fileId, { status: "failed" })
+          toast({
+            title: "Download failed",
+            description: "Failed to assemble received file.",
+            variant: "destructive",
           })
         }
       } catch (error) {
