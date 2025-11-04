@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import type { PeerConnection } from "@/lib/webrtc/peer-connection"
@@ -21,14 +21,24 @@ export function useRoom(roomId: string | null) {
     try {
       const { data, error } = await supabase
         .from("peers")
-        .select("*")
+        .select(`
+          *,
+          profiles!peers_user_id_fkey (
+            avatar_url
+          )
+        `)
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true })
 
       if (error) throw error
 
       if (data) {
-        setPeers(data)
+        const peersWithAvatars = data.map((peer: any) => ({
+          ...peer,
+          avatar_url: peer.profiles?.avatar_url || null,
+          profiles: undefined, // Remove the nested profiles object
+        }))
+        setPeers(peersWithAvatars)
       }
     } catch (error) {
       console.error("Error fetching peers:", error)

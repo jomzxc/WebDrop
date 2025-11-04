@@ -13,14 +13,15 @@ export interface Room {
   is_active: boolean
 }
 
+// avatar_url will be joined from profiles table when needed
 export interface Peer {
   id: string
   room_id: string
   user_id: string
   username: string
-  avatar_url: string | null
   joined_at: string
   last_seen: string
+  avatar_url?: string | null // Made optional since it comes from join
 }
 
 export interface FileTransfer {
