@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Shield, Zap, Users, Lock, ArrowRight, Github } from "lucide-react"
+import { Shield, Zap, Users, Infinity, ArrowRight, Github } from "lucide-react"
 import Link from "next/link"
+import Header from "@/components/header"
 import Footer from "@/components/footer"
 
 export default function LandingPage() {
@@ -47,46 +48,14 @@ export default function LandingPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 border-b border-border/40 backdrop-blur-xl bg-background/80">
-        <div className="container mx-auto px-4 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-lg">W</span>
-              </div>
-              <span className="text-xl font-bold">WebDrop</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              {isAuthenticated ? (
-                <>
-                  <Button variant="ghost" asChild>
-                    <Link href="/room">Dashboard</Link>
-                  </Button>
-                  <Button variant="ghost" asChild>
-                    <Link href="/profile">Profile</Link>
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" asChild>
-                    <Link href="/auth/login">Sign In</Link>
-                  </Button>
-                  <Button asChild className="bg-gradient-to-r from-primary to-accent">
-                    <Link href="/auth/sign-up">Get Started</Link>
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header />
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-48">
+      <section className="relative z-10 pt-24 pb-32 lg:pt-40 lg:pb-48">
         <div className="container mx-auto px-4 lg:px-8">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
+          <div className="max-w-4xl mx-auto text-center space-y-10">
             <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
-              <span className="block">Share files instantly.</span>
+              <span className="block mb-2">Share files instantly.</span>
               <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
                 No limits. No storage.
               </span>
@@ -95,7 +64,7 @@ export default function LandingPage() {
               Peer-to-peer file sharing powered by WebRTC. Your files never touch our servers. Fast, secure, and
               private.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
               <Button
                 size="lg"
                 onClick={handleGetStarted}
@@ -116,21 +85,21 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="relative z-10 py-20 lg:py-32">
+      <section className="relative z-10 py-24 lg:py-40">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl lg:text-5xl font-bold mb-4">Why WebDrop?</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <div className="text-center mb-20">
+              <h2 className="text-3xl lg:text-5xl font-bold mb-6">Why WebDrop?</h2>
+              <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
                 Built for privacy, speed, and simplicity. No compromises.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Shield className="w-6 h-6 text-primary" />
+                <CardContent className="pt-8 space-y-4">
+                  <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Shield className="w-7 h-7 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold">End-to-End Encrypted</h3>
                   <p className="text-muted-foreground leading-relaxed">
@@ -140,9 +109,9 @@ export default function LandingPage() {
               </Card>
 
               <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Zap className="w-6 h-6 text-accent" />
+                <CardContent className="pt-8 space-y-4">
+                  <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Zap className="w-7 h-7 text-accent" />
                   </div>
                   <h3 className="text-xl font-semibold">Lightning Fast</h3>
                   <p className="text-muted-foreground leading-relaxed">
@@ -152,13 +121,25 @@ export default function LandingPage() {
               </Card>
 
               <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Users className="w-6 h-6 text-primary" />
+                <CardContent className="pt-8 space-y-4">
+                  <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-7 h-7 text-primary" />
                   </div>
                   <h3 className="text-xl font-semibold">Real-Time Collaboration</h3>
                   <p className="text-muted-foreground leading-relaxed">
                     Share with multiple people simultaneously in private rooms.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
+                <CardContent className="pt-8 space-y-4">
+                  <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Infinity className="w-7 h-7 text-accent" />
+                  </div>
+                  <h3 className="text-xl font-semibold">Unlimited Transfers</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Transfer files up to 500MB as many times as you need. No daily limits.
                   </p>
                 </CardContent>
               </Card>
@@ -168,15 +149,15 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="relative z-10 py-20 lg:py-32 bg-muted/20">
+      <section className="relative z-10 py-24 lg:py-40 bg-muted/20">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl lg:text-5xl font-bold mb-4">How It Works</h2>
-              <p className="text-lg text-muted-foreground">Simple, secure file sharing in three steps</p>
+            <div className="text-center mb-20">
+              <h2 className="text-3xl lg:text-5xl font-bold mb-6">How It Works</h2>
+              <p className="text-lg lg:text-xl text-muted-foreground">Simple, secure file sharing in three steps</p>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-12">
               <div className="flex gap-6 items-start">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
                   1
@@ -221,7 +202,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative z-10 py-20 lg:py-32">
+      <section className="relative z-10 py-24 lg:py-40">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <h2 className="text-4xl lg:text-6xl font-bold">Ready to share securely?</h2>

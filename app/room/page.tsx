@@ -7,6 +7,7 @@ import RoomManager from "@/components/room-manager"
 import FileTransferPanel from "@/components/file-transfer-panel"
 import PeerList from "@/components/peer-list"
 import Header from "@/components/header"
+import Footer from "@/components/footer"
 import { useRoom } from "@/lib/hooks/use-room"
 import { useFileTransfer } from "@/lib/hooks/use-file-transfer"
 import { PeerConnection } from "@/lib/webrtc/peer-connection"
@@ -420,13 +421,13 @@ export default function RoomPage() {
   if (!user) return null
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground flex flex-col">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
       </div>
 
-      <div className="relative z-10">
+      <div className="relative z-10 flex-1">
         <Header />
 
         <div className="container mx-auto px-4 lg:px-8 py-12 lg:py-16">
@@ -474,6 +475,8 @@ export default function RoomPage() {
           </div>
         </div>
       </div>
+
+      <Footer />
     </main>
   )
 }

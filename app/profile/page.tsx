@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Loader2, ArrowLeft } from "lucide-react"
+import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
+import Header from "@/components/header"
+import Footer from "@/components/footer"
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
@@ -203,23 +204,16 @@ export default function ProfilePage() {
   const currentAvatar = profile?.avatar_url
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground flex flex-col">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
-        <div className="max-w-4xl mx-auto space-y-8">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/room">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Link>
-            </Button>
-          </div>
+      <Header />
 
+      <div className="relative z-10 flex-1 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
+        <div className="max-w-4xl mx-auto space-y-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
               Profile Settings
@@ -412,6 +406,8 @@ export default function ProfilePage() {
           </Card>
         </div>
       </div>
+
+      <Footer />
     </main>
   )
 }
