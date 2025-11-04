@@ -44,7 +44,7 @@ export default function ProfilePage() {
     fetchUserData()
   }, [])
 
-  const fetchUserData = async (forceRefresh: boolean = false) => {
+  const fetchUserData = async (forceRefresh = false) => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -167,7 +167,7 @@ export default function ProfilePage() {
     const { error } = await supabase.from("profiles").update({ avatar_url: newUrl }).eq("id", user.id)
     if (error) throw error
 
-    await fetchUserData(true) // Re-fetch user data and refresh router
+    await fetchUserData(true)
   }
 
   const resizeImage = (file: File, size: number): Promise<Blob> => {
@@ -325,14 +325,12 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* --- NEW: Avatar Card (replaces modal) --- */}
           <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl" id="change-avatar">
             <CardHeader>
               <CardTitle>Change Profile Picture</CardTitle>
               <CardDescription>Select a pre-made avatar or upload your own.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Pre-made Avatars */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Palette className="w-4 h-4" />
@@ -342,6 +340,7 @@ export default function ProfilePage() {
                   {PREMADE_AVATARS.map((gradient) => (
                     <button
                       key={gradient}
+                      type="button"
                       onClick={() => handleSelectPremade(gradient)}
                       className={cn(
                         "h-16 w-16 rounded-full transition-all",
@@ -357,19 +356,29 @@ export default function ProfilePage() {
 
               <Separator />
 
-              {/* Custom Upload */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Upload className="w-4 h-4" />
                   Upload Your Own
                 </Label>
-                <Button variant="outline" className="w-full" onClick={handleUploadClick} disabled={isUploading}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  onClick={handleUploadClick}
+                  disabled={isUploading}
+                >
                   {isUploading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
                   ) : (
-                    <Upload className="w-4 h-4 mr-2" />
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Image
+                    </>
                   )}
-                  {isUploading ? "Uploading..." : "Upload Image"}
                 </Button>
                 <input
                   type="file"
@@ -446,11 +455,11 @@ export default function ProfilePage() {
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   )
 }
