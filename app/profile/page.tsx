@@ -68,27 +68,11 @@ export default function ProfilePage() {
     setUser(user)
     setIdentities(user.identities || [])
 
-    const providerAvatar = user.user_metadata?.avatar_url
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-    console.log("[v0] Profile data:", profileData)
-    console.log("[v0] Avatar URL:", profileData?.avatar_url)
-    console.log("[v0] Is premade avatar:", profileData?.avatar_url?.startsWith("bg-"))
-
     if (profileData) {
-      if (!profileData.avatar_url && providerAvatar) {
-        const { data: updatedProfile } = await supabase
-          .from("profiles")
-          .update({ avatar_url: providerAvatar })
-          .eq("id", user.id)
-          .select()
-          .single()
-        setProfile(updatedProfile || profileData)
-        setUsername(updatedProfile?.username || profileData.username || "")
-      } else {
-        setProfile(profileData)
-        setUsername(profileData.username || "")
-      }
+      setProfile(profileData)
+      setUsername(profileData.username || "")
     }
 
     if (forceRefresh) {
@@ -163,7 +147,6 @@ export default function ProfilePage() {
       await updateAvatarUrl(newAvatarUrl)
       setMessage({ type: "success", text: "Avatar updated successfully!" })
 
-      // Reset file input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
@@ -301,16 +284,13 @@ export default function ProfilePage() {
               {/* Current Avatar Preview */}
               <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-muted/20 border border-border/50">
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  {currentAvatar && !isPremadeAvatar && (
-                    <AvatarImage
-                      src={currentAvatar || "/placeholder.svg"}
-                      alt={username || user.email || "User avatar"}
-                    />
+                  {!isPremadeAvatar && (
+                    <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
                   )}
                   <AvatarFallback
                     className={cn(
                       "text-3xl font-semibold text-white",
-                      isPremadeAvatar && currentAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
+                      isPremadeAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
                     )}
                   >
                     {getInitials(username, user.email)}
