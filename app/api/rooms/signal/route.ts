@@ -41,11 +41,13 @@ export async function POST(request: Request) {
     })
 
     if (signalError) {
-      return NextResponse.json({ error: "Failed to send signal" }, { status: 500 })
+      console.error("[v0] Signaling database error:", signalError)
+      return NextResponse.json({ error: "Failed to send signal", details: signalError.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error("[v0] Signal route error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

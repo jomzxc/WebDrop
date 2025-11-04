@@ -31,16 +31,20 @@ export default function Home() {
       console.log("[v0] Sending signal to peer:", toPeerId, "Type:", signal.type)
 
       try {
-        const { error } = await supabase.from("signaling").insert({
-          room_id: roomId,
-          from_peer_id: user.id,
-          to_peer_id: toPeerId,
-          signal_data: signal,
+        const response = await fetch("/api/rooms/signal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roomId,
+            targetPeerId: toPeerId,
+            signal,
+          }),
         })
 
-        if (error) {
-          console.error("[v0] Error sending signal:", error)
-          throw error
+        if (!response.ok) {
+          const error = await response.json()
+          console.error("[v0] Signal API error:", error)
+          throw new Error(error.error || "Failed to send signal")
         }
 
         console.log("[v0] Signal sent successfully")
@@ -48,12 +52,12 @@ export default function Home() {
         console.error("[v0] Failed to send signal:", error)
         toast({
           title: "Signaling error",
-          description: "Failed to send connection signal",
+          description: "Failed to send connection signal. Make sure the signaling table exists.",
           variant: "destructive",
         })
       }
     },
-    [user, roomId, supabase, toast],
+    [user, roomId, toast],
   )
 
   useEffect(() => {
