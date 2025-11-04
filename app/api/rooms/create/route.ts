@@ -27,28 +27,30 @@ export async function POST() {
       .single()
 
     if (error) {
+      console.error("Failed to create room:", error)
       return NextResponse.json({ error: "Failed to create room. Please try again." }, { status: 500 })
     }
 
     // Get user profile
-    const { data: profile } = await supabase.from("profiles").select("username, avatar_url").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single()
 
     // Add creator as first peer
     const { error: peerError } = await supabase.from("peers").insert({
       room_id: roomId,
       user_id: user.id,
       username: profile?.username || user.email?.split("@")[0] || "Anonymous",
-      avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || null,
       last_seen: new Date().toISOString(),
     })
 
     if (peerError) {
+      console.error("Failed to create peer:", peerError)
       await supabase.from("rooms").delete().eq("id", roomId)
       return NextResponse.json({ error: "Failed to initialize room" }, { status: 500 })
     }
 
     return NextResponse.json({ room: data })
   } catch (error) {
+    console.error("Create room error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
