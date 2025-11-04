@@ -112,8 +112,8 @@ export class FileTransferManager {
     return blob
   }
 
-  getMetadata(fileId: string): FileMetadata | null {
-    return this.pendingTransfers.get(fileId)?.metadata || null
+  getMetadata(fileId: string): FileMetadata | undefined {
+    return this.pendingTransfers.get(fileId)?.metadata
   }
 
   cancelTransfer(fileId: string) {
