@@ -1,30 +1,86 @@
-# Peer-to-peer file transfer
+# WebDrop: Peer-to-Peer File Transfer
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+WebDrop is a high-speed, secure, peer-to-peer file transfer application. It uses WebRTC for direct browser-to-browser communication, meaning your files are never uploaded to a central server. All signaling and room management is handled securely by Supabase.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/jomzxcs-projects/v0-peer-to-peer-file-transfer)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/g0bO3JvThsD)
+## ✨ Features
 
-## Overview
+* **Secure P2P Transfer:** Files are sent directly between users using encrypted WebRTC data channels.
+* **Room-Based Connections:** Users can create a private room or join an existing one with an 8-character ID.
+* **Real-time Presence:** See who is online in your room with live status updates (Connecting, Live, Offline) powered by Supabase Presence.
+* **User Authentication:** Secure sign-up and login with Email or GitHub.
+* **Profile Management:** Users can update their username and profile picture.
+* **Custom Avatars:** Choose from pre-made gradient avatars or upload your own, with client-side resizing for speed and efficiency.
+* **Robust Error Handling:** Gracefully handles page refreshes and browser disconnects.
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+## 💻 Tech Stack
 
-## Deployment
+* **Framework:** Next.js (App Router)
+* **Language:** TypeScript
+* **Backend & Auth:** Supabase (Auth, Postgres, Realtime, Presence, Storage)
+* **P2P:** WebRTC (RTCPeerConnection, RTCDataChannel)
+* **Styling:** Tailwind CSS & shadcn/ui
+* **Icons:** Lucide-React
 
-Your project is live at:
+---
 
-**[https://vercel.com/jomzxcs-projects/v0-peer-to-peer-file-transfer](https://vercel.com/jomzxcs-projects/v0-peer-to-peer-file-transfer)**
+## 🚀 Getting Started
 
-## Build your app
+To run this project, you will need a Supabase project.
 
-Continue building your app on:
+### 1. Supabase Setup
 
-**[https://v0.app/chat/g0bO3JvThsD](https://v0.app/chat/g0bO3JvThsD)**
+1.  Go to [Supabase.com](https://supabase.com) and create a new project.
+2.  Go to the **SQL Editor** (`<>` icon).
+3.  Copy the contents of the following files from the `/scripts` directory and run them **in this order**:
+    1.  `001_create_tables.sql` (Creates `profiles`, `rooms`, `peers`, `file_transfers`)
+    2.  `002_profile_trigger.sql` (Auto-creates a user profile on sign-up)
+    3.  `003_update_timestamp_trigger.sql` (Auto-updates `updated_at` on profiles)
+    4.  `005_enable_realtime.sql` (Enables realtime updates for `rooms` and `peers`)
+    5.  `006_avatar_storage.sql` (Creates the secure `avatars` storage bucket)
 
-## How It Works
+4.  **Enable GitHub Auth:**
+    * Go to **Authentication** -> **Providers**.
+    * Enable **GitHub**. You will need to add your GitHub App's Client ID and Secret.
+    * **IMPORTANT:** Add `https://[YOUR-PROJECT-REF].supabase.co/auth/v1/callback` as the callback URL in your GitHub OAuth App settings.
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+5.  **Configure Site URLs:**
+    * Go to **Authentication** -> **URL Configuration**.
+    * Add your deployment URL (e.g., `https://your-app.vercel.app`) and local dev URL (`http://localhost:3000`) to the **Site URL** and **Redirect URLs** fields.
+    * Add `http://localhost:3000/**` to the Redirect URLs for local development.
+
+### 2. Local Development
+
+1.  Clone the repository:
+    ```bash
+    git clone [https://github.com/](https://github.com/)[YOUR_USERNAME]/[YOUR_REPO].git
+    cd [YOUR_REPO]
+    ```
+
+2.  Install dependencies (using `pnpm` as defined in your lockfile):
+    ```bash
+    pnpm install
+    ```
+
+3.  Set up environment variables:
+    * Find your Supabase Project URL and Anon Key in **Project Settings** -> **API**.
+    * Create a new file named `.env.local` in the root of the project.
+    * Add your keys to it:
+        ```
+        NEXT_PUBLIC_SUPABASE_URL=https://[YOUR-PROJECT-REF].supabase.co
+        NEXT_PUBLIC_SUPABASE_ANON_KEY=[YOUR-ANON-KEY]
+        ```
+
+4.  Run the development server:
+    ```bash
+    pnpm dev
+    ```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the running application.
+
+---
+
+## ⚠️ File Size Limit
+
+This application is designed to chunk files and send them peer-to-peer. The file chunks are re-assembled in the **receiver's browser memory (RAM)**.
+
+To prevent browser crashes on low-memory devices, there is a hard-coded limit of **500 MB** per file. This is set as a constant `MAX_FILE_SIZE` in `lib/hooks/use-file-transfer.ts`. You can increase this, but be aware that it significantly increases the risk of crashing the receiver's browser.
