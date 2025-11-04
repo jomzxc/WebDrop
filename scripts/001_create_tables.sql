@@ -56,12 +56,12 @@ create policy "rooms_delete_own"
   using (auth.uid() = created_by);
 
 -- Create peers table to track who's in which room
+-- Removed avatar_url column - it should only exist in profiles table
 create table if not exists public.peers (
   id uuid primary key default gen_random_uuid(),
   room_id text references public.rooms(id) on delete cascade,
   user_id uuid references auth.users(id) on delete cascade,
   username text not null,
-  avatar_url text,
   joined_at timestamp with time zone default now(),
   last_seen timestamp with time zone default now(),
   unique(room_id, user_id)
@@ -115,5 +115,3 @@ create policy "file_transfers_insert_own"
 create policy "file_transfers_update_involved"
   on public.file_transfers for update
   using (auth.uid() = sender_id or auth.uid() = receiver_id);
-
-}

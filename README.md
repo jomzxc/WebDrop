@@ -31,7 +31,13 @@ To run this project, you will need a Supabase project.
 
 1.  Go to [Supabase.com](https://supabase.com) and create a new project.
 2.  Go to the **SQL Editor** (`<>` icon).
-3.  Copy the contents of the following files from the `/scripts` directory and run them.
+3.  Copy the contents of the following files from the `/scripts` directory and run them **in this order**:
+    1.  `001_create_tables.sql` (Creates `profiles`, `rooms`, `peers`, `file_transfers`)
+    2.  `002_profile_trigger.sql` (Auto-creates a user profile on sign-up)
+    3.  `003_update_timestamp_trigger.sql` (Auto-updates `updated_at` on profiles)
+    4.  `005_enable_realtime.sql` (Enables realtime updates for `rooms` and `peers`)
+    5.  `006_avatar_storage.sql` (Creates the secure `avatars` storage bucket)
+
 4.  **Enable GitHub Auth:**
     * Go to **Authentication** -> **Providers**.
     * Enable **GitHub**. You will need to add your GitHub App's Client ID and Secret.
