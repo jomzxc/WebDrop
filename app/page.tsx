@@ -1,479 +1,256 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import RoomManager from "@/components/room-manager"
-import FileTransferPanel from "@/components/file-transfer-panel"
-import PeerList from "@/components/peer-list"
-import Header from "@/components/header"
-import { useRoom } from "@/lib/hooks/use-room"
-import { useFileTransfer } from "@/lib/hooks/use-file-transfer"
-import { PeerConnection } from "@/lib/webrtc/peer-connection"
-import { useToast } from "@/hooks/use-toast"
-import type { RealtimeChannel } from "@supabase/supabase-js"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Shield, Zap, Users, Lock, ArrowRight, Github } from "lucide-react"
+import Link from "next/link"
+import Footer from "@/components/footer"
 
-export default function Home() {
-  const [roomId, setRoomId] = useState<string>("")
-  const [connected, setConnected] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const [peerConnections, setPeerConnections] = useState<Map<string, PeerConnection>>(new Map())
-  const [peerConnectionStates, setPeerConnectionStates] = useState<Map<string, string>>(new Map())
-  const [isAuthLoading, setIsAuthLoading] = useState(true)
-  const signalingChannelRef = useRef<RealtimeChannel | null>(null)
-  const [isChannelReady, setIsChannelReady] = useState(false)
-  const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map())
-  const previousPeerIdsRef = useRef<Set<string>>(new Set())
-  const pendingSignalsRef = useRef<Map<string, any[]>>(new Map())
-  const peersRef = useRef<any[]>([])
-  const refreshPeersRef = useRef<() => Promise<void>>()
-  const createPeerConnectionRef = useRef<(peerId: string, username: string, isInitiator: boolean) => PeerConnection>()
+export default function LandingPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
-  const { toast } = useToast()
-  const { peers, onlineUserIds, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(
-    connected ? roomId : null,
-  )
-  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
-
-  const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
   useEffect(() => {
-    const storedRoomId = sessionStorage.getItem("webdrop-roomId")
-    if (storedRoomId) {
-      setRoomId(storedRoomId)
-      setConnected(true)
-    }
-  }, [])
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAuthenticated(!!user)
+      setIsLoading(false)
+    })
+  }, [supabase])
 
-  const createPeerConnection = useCallback(
-    (peerId: string, username: string, isInitiator: boolean) => {
-      const pc = new PeerConnection(peerId, isInitiator, (signal) => {
-        sendSignalRef.current?.(peerId, signal)
-      })
-
-      pc.onData((data) => {
-        if (!data || !data.type) return
-
-        if (data.type === "file-metadata") {
-          handleFileMetadata(data.metadata, username)
-        } else if (data.type === "file-chunk") {
-          handleFileChunk(data.chunk)
-        } else if (data.type === "file-complete") {
-          handleFileComplete(data.fileId)
-        }
-      })
-
-      pc.onStateChange((state) => {
-        setPeerConnectionStates((prevStates) => new Map(prevStates).set(peerId, state))
-      })
-
-      pc.onError((error) => {
-        console.error("Connection error with", username, ":", error)
-        toast({
-          title: "Connection error",
-          description: `Failed to connect to ${username}`,
-          variant: "destructive",
-        })
-      })
-
-      return pc
-    },
-    [handleFileMetadata, handleFileChunk, handleFileComplete, toast],
-  )
-
-  useEffect(() => {
-    peersRef.current = peers
-  }, [peers])
-
-  useEffect(() => {
-    refreshPeersRef.current = refreshPeers
-  }, [refreshPeers])
-
-  useEffect(() => {
-    createPeerConnectionRef.current = createPeerConnection
-  }, [createPeerConnection])
-
-  useEffect(() => {
-    peerConnectionsRef.current = peerConnections
-  }, [peerConnections])
-
-  sendSignalRef.current = async (toPeerId: string, signal: any) => {
-    if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
-      return
-    }
-
-    try {
-      await signalingChannelRef.current.send({
-        type: "broadcast",
-        event: "webrtc-signal",
-        payload: {
-          fromPeerId: user.id,
-          toPeerId,
-          signal,
-        },
-      })
-    } catch (error) {
-      console.error("Failed to broadcast signal:", error)
-      toast({
-        title: "Signaling error",
-        description: "Failed to send connection signal",
-        variant: "destructive",
-      })
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      router.push("/room")
+    } else {
+      router.push("/auth/login")
     }
   }
 
-  const sendSignal = useCallback((toPeerId: string, signal: any) => {
-    return sendSignalRef.current?.(toPeerId, signal) || Promise.resolve()
-  }, [])
-
-  useEffect(() => {
-    if (!connected || !user || !roomId) {
-      setIsChannelReady(false)
-      return
-    }
-
-    const channel = supabase.channel(`room:${roomId}:signaling`, {
-      config: {
-        broadcast: { self: false, ack: false },
-        presence: { key: user.id },
-      },
-    })
-
-    channel.on("broadcast", { event: "webrtc-hello" }, (payload) => {
-      const { fromPeerId } = payload.payload
-      if (!fromPeerId || fromPeerId === user.id) return
-
-      const existingConnection = peerConnectionsRef.current.get(fromPeerId)
-      if (existingConnection) {
-        existingConnection.close()
-      }
-
-      const peer = peersRef.current.find((p) => p.user_id === fromPeerId)
-      if (!peer) {
-        return
-      }
-
-      const isInitiator = user.id < fromPeerId
-      const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
-      if (!pc) return
-
-      const newConnections = new Map(peerConnectionsRef.current)
-      newConnections.set(fromPeerId, pc)
-      setPeerConnections(newConnections)
-
-      const newStates = new Map(peerConnectionStates)
-      newStates.set(fromPeerId, "new")
-      setPeerConnectionStates(newStates)
-
-      if (isInitiator) {
-        pc.createOffer().catch((error) => {
-          console.error("Failed to create offer:", error)
-        })
-      }
-    })
-
-    channel.on("broadcast", { event: "webrtc-signal" }, async (payload) => {
-      const { fromPeerId, toPeerId, signal } = payload.payload
-
-      if (toPeerId !== user.id) {
-        return
-      }
-
-      let connection = peerConnectionsRef.current.get(fromPeerId)
-
-      if (!connection) {
-        const buffer = pendingSignalsRef.current.get(fromPeerId) || []
-        buffer.push(signal)
-        pendingSignalsRef.current.set(fromPeerId, buffer)
-        return
-      }
-
-      try {
-        if (signal.type === "offer") {
-          await connection.handleOffer(signal.offer)
-        } else if (signal.type === "answer") {
-          await connection.handleAnswer(signal.answer)
-        } else if (signal.type === "ice-candidate") {
-          await connection.handleIceCandidate(signal.candidate)
-        }
-      } catch (error) {
-        console.error("Error handling signal:", error)
-      }
-    })
-
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        signalingChannelRef.current = channel
-        setIsChannelReady(true)
-
-        channel.send({
-          type: "broadcast",
-          event: "webrtc-hello",
-          payload: { fromPeerId: user.id },
-        })
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        console.error("Signaling channel error:", status)
-        setIsChannelReady(false)
-      } else if (status === "CLOSED") {
-        setIsChannelReady(false)
-      }
-    })
-
-    return () => {
-      setIsChannelReady(false)
-      signalingChannelRef.current = null
-      supabase.removeChannel(channel)
-    }
-  }, [connected, user, roomId])
-
-  useEffect(() => {
-    if (!connected || !user || !isChannelReady) {
-      return
-    }
-
-    const currentPeerIds = new Set(peers.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
-    const previousPeerIds = previousPeerIdsRef.current
-
-    const peersChanged =
-      currentPeerIds.size !== previousPeerIds.size || Array.from(currentPeerIds).some((id) => !previousPeerIds.has(id))
-
-    if (!peersChanged) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      const currentPeers = peers.filter((p) => p.user_id !== user.id)
-      const newConnections = new Map(peerConnectionsRef.current)
-      const newStates = new Map(peerConnectionStates)
-
-      currentPeers.forEach((peer) => {
-        if (!newConnections.has(peer.user_id)) {
-          const isInitiator = user.id < peer.user_id
-          const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
-          if (pc) {
-            newConnections.set(peer.user_id, pc)
-            newStates.set(peer.user_id, "new")
-
-            const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
-            if (bufferedSignals && bufferedSignals.length > 0) {
-              bufferedSignals.forEach(async (signal) => {
-                try {
-                  if (signal.type === "offer") {
-                    await pc.handleOffer(signal.offer)
-                  } else if (signal.type === "answer") {
-                    await pc.handleAnswer(signal.answer)
-                  } else if (signal.type === "ice-candidate") {
-                    await pc.handleIceCandidate(signal.candidate)
-                  }
-                } catch (error) {
-                  console.error("Error processing buffered signal:", error)
-                }
-              })
-              pendingSignalsRef.current.delete(peer.user_id)
-            }
-
-            if (isInitiator) {
-              setTimeout(() => {
-                pc.createOffer().catch((error) => {
-                  console.error("Failed to create offer:", error)
-                  toast({
-                    title: "Connection failed",
-                    description: "Could not establish peer connection",
-                    variant: "destructive",
-                  })
-                })
-              }, 500)
-            }
-          }
-        }
-      })
-
-      Array.from(newConnections.keys()).forEach((peerId) => {
-        if (!currentPeerIds.has(peerId)) {
-          newConnections.get(peerId)?.close()
-          newConnections.delete(peerId)
-          newStates.delete(peerId)
-          pendingSignalsRef.current.delete(peerId)
-        }
-      })
-
-      setPeerConnections(newConnections)
-      setPeerConnectionStates(newStates)
-      previousPeerIdsRef.current = currentPeerIds
-    }, 1000)
-
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [connected, user, isChannelReady, peers, toast, createPeerConnection])
-
-  useEffect(() => {
-    return () => {
-      if (peerConnectionsRef.current.size > 0) {
-        peerConnectionsRef.current.forEach((conn) => conn.close())
-      }
-      pendingSignalsRef.current.clear()
-    }
-  }, [])
-
-  const handleJoinRoom = async (id: string) => {
-    try {
-      let finalRoomId = id
-
-      if (id === "create") {
-        finalRoomId = await createRoom()
-      } else {
-        await joinRoom(id)
-        finalRoomId = id
-      }
-
-      sessionStorage.setItem("webdrop-roomId", finalRoomId)
-      setRoomId(finalRoomId)
-      setConnected(true)
-    } catch (error: any) {
-      console.error("Failed to join room:", error)
-    }
-  }
-
-  const handleLeaveRoom = async () => {
-    peerConnections.forEach((pc) => pc.close())
-    setPeerConnections(new Map())
-    setPeerConnectionStates(new Map())
-    previousPeerIdsRef.current = new Set()
-    pendingSignalsRef.current.clear()
-    setIsChannelReady(false)
-
-    const channel = signalingChannelRef.current
-    if (channel) {
-      await channel.untrack()
-    }
-    signalingChannelRef.current = null
-
-    await leaveRoom(roomId)
-
-    sessionStorage.removeItem("webdrop-roomId")
-    setRoomId("")
-    setConnected(false)
-  }
-
-  const handleFileSelect = useCallback(
-    (files: FileList, peerId: string) => {
-      const peer = peersRef.current.find((p) => p.user_id === peerId)
-      const connection = peerConnectionsRef.current.get(peerId)
-
-      if (!peer || !connection) {
-        toast({
-          title: "Connection not ready",
-          description: "Peer connection not established yet",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const connectionState = connection.getConnectionState()
-
-      if (connectionState !== "connected") {
-        toast({
-          title: "Connection not ready",
-          description: `Connection state: ${connectionState}. Please wait...`,
-          variant: "destructive",
-        })
-        return
-      }
-
-      Array.from(files).forEach((file) => {
-        sendFile(file, peerId, peer.username, (data) => {
-          connection.sendData(data)
-        })
-      })
-    },
-    [toast, sendFile],
-  )
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      if (error || !user) {
-        router.push("/auth/login")
-      } else {
-        setUser(user)
-      }
-      setIsAuthLoading(false)
-    })
-  }, [router, supabase])
-
-  const isReadyToTransfer = Array.from(peerConnectionStates.entries()).some(([peerId, state]) => {
-    return onlineUserIds.has(peerId) && state === "connected"
-  })
-
-  if (isAuthLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
-  if (!user) return null
-
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
       </div>
 
-      <div className="relative z-10">
-        <Header />
+      {/* Navigation */}
+      <nav className="relative z-10 border-b border-border/40 backdrop-blur-xl bg-background/80">
+        <div className="container mx-auto px-4 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <span className="text-white font-bold text-lg">W</span>
+              </div>
+              <span className="text-xl font-bold">WebDrop</span>
+            </Link>
+            <div className="flex items-center gap-4">
+              {isAuthenticated ? (
+                <>
+                  <Button variant="ghost" asChild>
+                    <Link href="/room">Dashboard</Link>
+                  </Button>
+                  <Button variant="ghost" asChild>
+                    <Link href="/profile">Profile</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" asChild>
+                    <Link href="/auth/login">Sign In</Link>
+                  </Button>
+                  <Button asChild className="bg-gradient-to-r from-primary to-accent">
+                    <Link href="/auth/sign-up">Get Started</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
 
-        <div className="container mx-auto px-4 lg:px-8 py-12 lg:py-16">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-              <div className="lg:col-span-4">
-                <RoomManager
-                  onJoinRoom={handleJoinRoom}
-                  onLeaveRoom={handleLeaveRoom}
-                  connected={connected}
-                  roomId={roomId}
-                  isLoading={isLoading}
-                  isReadyToTransfer={isReadyToTransfer}
-                />
+      {/* Hero Section */}
+      <section className="relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-48">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
+              <span className="block">Share files instantly.</span>
+              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                No limits. No storage.
+              </span>
+            </h1>
+            <p className="text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Peer-to-peer file sharing powered by WebRTC. Your files never touch our servers. Fast, secure, and
+              private.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Button
+                size="lg"
+                onClick={handleGetStarted}
+                className="text-lg px-8 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+              >
+                Get Started
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+              <Button size="lg" variant="outline" asChild className="text-lg px-8 py-6 bg-transparent">
+                <Link href="https://github.com" target="_blank" rel="noopener noreferrer">
+                  <Github className="mr-2 w-5 h-5" />
+                  View on GitHub
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="relative z-10 py-20 lg:py-32">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl lg:text-5xl font-bold mb-4">Why WebDrop?</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Built for privacy, speed, and simplicity. No compromises.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Shield className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold">End-to-End Encrypted</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Your files are encrypted during transfer. We never see your data.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Zap className="w-6 h-6 text-accent" />
+                  </div>
+                  <h3 className="text-xl font-semibold">Lightning Fast</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Direct peer-to-peer connections mean maximum transfer speeds.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold">Real-Time Collaboration</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Share with multiple people simultaneously in private rooms.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Lock className="w-6 h-6 text-accent" />
+                  </div>
+                  <h3 className="text-xl font-semibold">No File Limits</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Transfer files of any size. No storage quotas or restrictions.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="relative z-10 py-20 lg:py-32 bg-muted/20">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl lg:text-5xl font-bold mb-4">How It Works</h2>
+              <p className="text-lg text-muted-foreground">Simple, secure file sharing in three steps</p>
+            </div>
+
+            <div className="space-y-8">
+              <div className="flex gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-2xl font-semibold mb-2">Create or Join a Room</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Start by creating a new room or joining an existing one with a room code. Rooms are private and
+                    secure.
+                  </p>
+                </div>
               </div>
 
-              <div className="lg:col-span-8 space-y-6">
-                {connected ? (
-                  <>
-                    <FileTransferPanel
-                      roomId={roomId}
-                      transfers={transfers}
-                      peers={peersRef.current}
-                      onFileSelect={handleFileSelect}
-                      currentUserId={user.id}
-                    />
-                    <PeerList
-                      peers={peersRef.current}
-                      onRefresh={refreshPeersRef.current}
-                      currentUserId={user.id}
-                      connectionStates={peerConnectionStates}
-                      onlineUserIds={onlineUserIds}
-                    />
-                  </>
-                ) : (
-                  <div className="h-64 flex items-center justify-center">
-                    <div className="text-center space-y-4">
-                      <div className="text-6xl text-muted-foreground/30">∿</div>
-                      <p className="text-lg text-muted-foreground font-medium">Join or create a room to begin</p>
-                    </div>
-                  </div>
-                )}
+              <div className="flex gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xl">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-2xl font-semibold mb-2">Connect with Peers</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Once in a room, you'll see all connected peers. Direct peer-to-peer connections are established
+                    automatically.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6 items-start">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-2xl font-semibold mb-2">Share Files Instantly</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Select files and choose recipients. Files are transferred directly between peers with end-to-end
+                    encryption.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </section>
+
+      {/* CTA Section */}
+      <section className="relative z-10 py-20 lg:py-32">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <h2 className="text-4xl lg:text-6xl font-bold">Ready to share securely?</h2>
+            <p className="text-xl text-muted-foreground">Join thousands of users sharing files the private way.</p>
+            <Button
+              size="lg"
+              onClick={handleGetStarted}
+              className="text-lg px-8 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            >
+              Get Started Free
+              <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+    </div>
   )
 }

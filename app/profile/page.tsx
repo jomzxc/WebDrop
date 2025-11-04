@@ -212,12 +212,12 @@ export default function ProfilePage() {
       <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to App
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/room">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Link>
+            </Button>
           </div>
 
           <div>

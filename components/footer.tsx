@@ -1,36 +1,29 @@
 import Link from "next/link"
-import { Github } from "lucide-react"
+import { Github, Twitter, Mail } from "lucide-react"
 
 export default function Footer() {
   return (
-    <footer className="relative z-10 border-t border-border/50 backdrop-blur-xl bg-background/80">
+    <footer className="relative z-10 border-t border-border/40 backdrop-blur-xl bg-background/80">
       <div className="container mx-auto px-4 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
           <div className="space-y-4">
-            <Link href="/landing" className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                 <span className="text-white font-bold text-lg">W</span>
               </div>
               <span className="text-xl font-bold">WebDrop</span>
-            </Link>
+            </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Fast, secure P2P file sharing through direct peer-to-peer connections.
+              Secure peer-to-peer file sharing powered by WebRTC. Your privacy is our priority.
             </p>
           </div>
 
-          {/* Product */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Product</h3>
+          <div>
+            <h3 className="font-semibold mb-4">Product</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/landing" className="hover:text-foreground transition-colors">
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link href="/landing" className="hover:text-foreground transition-colors">
-                  How it Works
+                <Link href="/room" className="hover:text-foreground transition-colors">
+                  Dashboard
                 </Link>
               </li>
               <li>
@@ -38,71 +31,66 @@ export default function Footer() {
                   Get Started
                 </Link>
               </li>
+              <li>
+                <Link href="/#features" className="hover:text-foreground transition-colors">
+                  Features
+                </Link>
+              </li>
             </ul>
           </div>
 
-          {/* Resources */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Resources</h3>
+          <div>
+            <h3 className="font-semibold mb-4">Resources</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a
-                  href="https://github.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-foreground transition-colors"
-                >
+                <Link href="https://github.com" className="hover:text-foreground transition-colors">
                   Documentation
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="https://github.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-foreground transition-colors"
-                >
+                <Link href="https://github.com" className="hover:text-foreground transition-colors">
                   GitHub
-                </a>
+                </Link>
               </li>
               <li>
-                <Link href="/landing" className="hover:text-foreground transition-colors">
+                <Link href="https://github.com" className="hover:text-foreground transition-colors">
                   Support
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Legal */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Legal</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/landing" className="hover:text-foreground transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/landing" className="hover:text-foreground transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
+          <div>
+            <h3 className="font-semibold mb-4">Connect</h3>
+            <div className="flex gap-4">
+              <Link
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
+              >
+                <Github className="w-5 h-5" />
+              </Link>
+              <Link
+                href="https://twitter.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
+              >
+                <Twitter className="w-5 h-5" />
+              </Link>
+              <Link
+                href="mailto:contact@webdrop.com"
+                className="w-10 h-10 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
+              >
+                <Mail className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© 2025 WebDrop. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Github className="w-5 h-5" />
-            </a>
-          </div>
+        <div className="mt-12 pt-8 border-t border-border/40 text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} WebDrop. All rights reserved.</p>
         </div>
       </div>
     </footer>

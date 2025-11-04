@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Github, Mail, AlertCircle } from "lucide-react"
+import { Github, Mail, AlertCircle, ArrowLeft } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -39,7 +39,7 @@ export default function LoginPage() {
         password,
       })
       if (error) throw error
-      router.push("/")
+      router.push("/room")
       router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
@@ -68,8 +68,6 @@ export default function LoginPage() {
       })
 
       if (error) throw error
-
-      // OAuth redirect happens automatically, no need to manually redirect
     } catch (error: unknown) {
       console.error("OAuth error:", error)
       setError(error instanceof Error ? error.message : "OAuth provider not enabled. Please check Supabase dashboard.")
@@ -85,6 +83,15 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-md relative z-10">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Link>
+          </Button>
+        </div>
+
         <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
           <CardHeader className="space-y-2">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
