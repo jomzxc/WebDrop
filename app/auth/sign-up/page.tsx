@@ -64,7 +64,7 @@ export default function SignUpPage() {
         router.refresh()
       }
     } catch (error: unknown) {
-      console.error("[v0] Sign up error:", error)
+      console.error("Sign up error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
@@ -94,7 +94,7 @@ export default function SignUpPage() {
 
       // OAuth redirect happens automatically
     } catch (error: unknown) {
-      console.error("[v0] OAuth error:", error)
+      console.error("OAuth error:", error)
       setError(error instanceof Error ? error.message : "OAuth provider not enabled. Please check Supabase dashboard.")
       setIsLoading(false)
     }
