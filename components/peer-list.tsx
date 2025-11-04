@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, Zap, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
 import type { Peer } from "@/lib/types/database"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { cn } from "@/lib/utils"
 
 interface PeerListProps {
   peers: Peer[]
@@ -22,7 +24,11 @@ export default function PeerList({
 }: PeerListProps) {
   const otherPeers = peers.filter((p) => p.user_id !== currentUserId)
 
-  // This function now just returns the visuals for a given state
+  // Helper function to get initials
+  const getInitials = (name: string) => {
+    return name ? name.slice(0, 2).toUpperCase() : "P"
+  }
+
   const getStatusVisuals = (state: string) => {
     switch (state) {
       case "connected":
@@ -51,7 +57,7 @@ export default function PeerList({
       default: // 'disconnected', 'failed', 'closed', or any other state
         return {
           dot: "w-1.5 h-1.5 rounded-full bg-red-500",
-          text: "Disconnected",
+          text: "Offline", // Changed from Disconnected
           badge: (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 rounded-lg">
               <AlertCircle className="w-3.5 h-3.5 text-red-500" />
@@ -90,10 +96,10 @@ export default function PeerList({
         <div className="space-y-2">
           {otherPeers.map((peer) => {
             const isOnline = onlineUserIds.has(peer.user_id)
-
             const state = isOnline ? connectionStates.get(peer.user_id) || "connecting" : "offline"
-
             const status = getStatusVisuals(state)
+
+            const isPremadeAvatar = peer.avatar_url?.startsWith("bg-")
 
             return (
               <div
@@ -101,9 +107,19 @@ export default function PeerList({
                 className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 border border-border/40 rounded-xl transition-all hover:shadow-lg"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-primary/80 flex items-center justify-center font-bold text-primary-foreground text-sm shadow-lg">
-                    {peer.username.charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar className="h-10 w-10">
+                    {!isPremadeAvatar && (
+                      <AvatarImage src={peer.avatar_url || "/placeholder.svg"} alt={peer.username} />
+                    )}
+                    <AvatarFallback
+                      className={cn(
+                        "bg-gradient-to-br from-primary to-accent text-white font-semibold",
+                        isPremadeAvatar && peer.avatar_url,
+                      )}
+                    >
+                      {getInitials(peer.username)}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
                     <p className="font-semibold text-foreground text-sm">{peer.username}</p>
                     <div className="flex items-center gap-1.5 mt-1">
