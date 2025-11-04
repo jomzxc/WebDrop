@@ -92,7 +92,7 @@ export default function Home() {
 
     console.log("[v0] 🔌 Setting up signaling channel for room:", roomId)
 
-    const channel = supabase.channel(`room:${roomId}`, {
+    const channel = supabase.channel(`room:${roomId}:signaling`, {
       config: {
         broadcast: { self: false, ack: false },
       },
@@ -140,30 +140,17 @@ export default function Home() {
       }
     })
 
-    // Subscribe and handle the subscription status
-    channel.subscribe(async (status, err) => {
-      console.log("[v0] 📡 Signaling channel status:", status, err ? `Error: ${err}` : "")
+    // Subscribe and set ready immediately
+    channel.subscribe((status) => {
+      console.log("[v0] 📡 Signaling channel subscription status:", status)
 
       if (status === "SUBSCRIBED") {
-        console.log("[v0] ✅ Signaling channel SUBSCRIBED successfully")
+        console.log("[v0] ✅ Signaling channel SUBSCRIBED - setting ready")
         signalingChannelRef.current = channel
         setIsChannelReady(true)
-      } else if (status === "CHANNEL_ERROR") {
-        console.error("[v0] ❌ Signaling channel error:", err)
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error("[v0] ❌ Signaling channel error:", status)
         setIsChannelReady(false)
-        toast({
-          title: "Connection error",
-          description: "Failed to establish signaling channel",
-          variant: "destructive",
-        })
-      } else if (status === "TIMED_OUT") {
-        console.error("[v0] ❌ Signaling channel timed out")
-        setIsChannelReady(false)
-        toast({
-          title: "Connection timeout",
-          description: "Signaling channel timed out",
-          variant: "destructive",
-        })
       } else if (status === "CLOSED") {
         console.log("[v0] 🔒 Signaling channel closed")
         setIsChannelReady(false)
