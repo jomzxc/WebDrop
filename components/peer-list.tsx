@@ -1,29 +1,39 @@
 "use client"
 
 import { Card } from "@/components/ui/card"
-import { Users, Zap } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Users, Zap, RefreshCw } from "lucide-react"
 import type { Peer } from "@/lib/types/database"
 
 interface PeerListProps {
   peers: Peer[]
+  onRefresh?: () => void
 }
 
-export default function PeerList({ peers }: PeerListProps) {
+export default function PeerList({ peers, onRefresh }: PeerListProps) {
   return (
     <Card className="p-8 space-y-6 backdrop-blur-xl border border-border/50 bg-card/40 shadow-2xl rounded-2xl overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
 
       <div className="relative space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg">
-            <Users className="w-5 h-5 text-accent" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg">
+              <Users className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-foreground">Connected Peers</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {peers.length} peer{peers.length !== 1 ? "s" : ""} active
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-foreground">Connected Peers</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {peers.length} peer{peers.length !== 1 ? "s" : ""} active
-            </p>
-          </div>
+          {onRefresh && (
+            <Button variant="outline" size="sm" onClick={onRefresh} className="gap-2 bg-transparent">
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">

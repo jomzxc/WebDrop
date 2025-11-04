@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import type { PeerConnection } from "@/lib/webrtc/peer-connection"
@@ -12,6 +12,7 @@ export function useRoom(roomId: string | null) {
   const [isLoading, setIsLoading] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchPeers = useCallback(async () => {
     if (!roomId) return
@@ -42,6 +43,10 @@ export function useRoom(roomId: string | null) {
   useEffect(() => {
     if (!roomId) {
       setPeers([])
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
       return
     }
 
@@ -49,72 +54,56 @@ export function useRoom(roomId: string | null) {
 
     fetchPeers()
 
+    pollingIntervalRef.current = setInterval(() => {
+      console.log("[v0] Polling for peer updates...")
+      fetchPeers()
+    }, 3000)
+
     const channel = supabase
       .channel(`room:${roomId}`, {
         config: {
-          broadcast: { self: true }, // Changed to true to receive own changes
+          broadcast: { self: true },
           presence: { key: "" },
         },
       })
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Listen to all events
           schema: "public",
           table: "peers",
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log("[v0] Peer INSERT detected:", payload.new)
-          setPeers((current) => {
-            const exists = current.some((p) => p.id === payload.new.id)
-            if (exists) return current
-            return [...current, payload.new as Peer]
-          })
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "peers",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          console.log("[v0] Peer UPDATE detected:", payload.new)
-          setPeers((current) => current.map((p) => (p.id === payload.new.id ? (payload.new as Peer) : p)))
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "peers",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          console.log("[v0] Peer DELETE detected:", payload.old)
-          setPeers((current) => current.filter((p) => p.id !== payload.old.id))
+          console.log("[v0] Realtime event received:", payload.eventType, payload)
+
+          fetchPeers()
         },
       )
       .subscribe((status, err) => {
         console.log("[v0] Subscription status:", status)
         if (err) {
           console.error("[v0] Subscription error:", err)
+          toast({
+            title: "Realtime connection issue",
+            description: "Using polling fallback for updates",
+            variant: "default",
+          })
         }
         if (status === "SUBSCRIBED") {
-          console.log("[v0] Subscription active, refetching peers")
-          fetchPeers()
+          console.log("[v0] Realtime subscription active!")
         }
       })
 
     return () => {
       console.log("[v0] Cleaning up room subscription")
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
       supabase.removeChannel(channel)
     }
-  }, [roomId, fetchPeers, supabase])
+  }, [roomId, fetchPeers, supabase, toast])
 
   const createRoom = async () => {
     setIsLoading(true)
@@ -196,7 +185,6 @@ export function useRoom(roomId: string | null) {
   const leaveRoom = async (id: string) => {
     setIsLoading(true)
     try {
-      // Close all peer connections
       connections.forEach((conn) => conn.close())
       setConnections(new Map())
 
@@ -234,5 +222,6 @@ export function useRoom(roomId: string | null) {
     createRoom,
     joinRoom,
     leaveRoom,
+    refreshPeers: fetchPeers,
   }
 }

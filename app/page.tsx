@@ -21,7 +21,7 @@ export default function Home() {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
-  const { peers, isLoading, createRoom, joinRoom, leaveRoom } = useRoom(connected ? roomId : null)
+  const { peers, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(connected ? roomId : null)
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function Home() {
   useEffect(() => {
     if (!connected || !user || !roomId) return
 
-    console.log("[v0] Setting up signaling subscription for user:", user.id) // Added debug logging
+    console.log("[v0] Setting up signaling subscription for user:", user.id)
 
     const signalingChannel = supabase
       .channel(`signaling:${roomId}:${user.id}`, {
@@ -56,13 +56,13 @@ export default function Home() {
           filter: `to_peer_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("[v0] Received signal:", payload) // Added debug logging
+          console.log("[v0] Received signal:", payload)
           const signal = payload.new.signal_data
           const fromPeerId = payload.new.from_peer_id
           const connection = peerConnections.get(fromPeerId)
 
           if (!connection) {
-            console.error("[v0] No connection found for peer:", fromPeerId) // Added debug logging
+            console.error("[v0] No connection found for peer:", fromPeerId)
             return
           }
 
@@ -75,16 +75,16 @@ export default function Home() {
               await connection.handleIceCandidate(signal.candidate)
             }
           } catch (error) {
-            console.error("[v0] Error handling signal:", error) // Added debug logging
+            console.error("[v0] Error handling signal:", error)
           }
         },
       )
       .subscribe((status) => {
-        console.log("[v0] Signaling subscription status:", status) // Added debug logging
+        console.log("[v0] Signaling subscription status:", status)
       })
 
     return () => {
-      console.log("[v0] Cleaning up signaling subscription") // Added debug logging
+      console.log("[v0] Cleaning up signaling subscription")
       supabase.removeChannel(signalingChannel)
     }
   }, [connected, user, roomId, peerConnections, supabase])
@@ -176,7 +176,7 @@ export default function Home() {
       const peer = peers.find((p) => p.user_id === peerId)
       const connection = peerConnections.get(peerId)
 
-      console.log("[v0] File select - Peer:", peer?.username, "Connection:", connection?.getConnectionState()) // Added debug logging
+      console.log("[v0] File select - Peer:", peer?.username, "Connection:", connection?.getConnectionState())
 
       if (!peer || !connection) {
         toast({
@@ -188,7 +188,7 @@ export default function Home() {
       }
 
       const connectionState = connection.getConnectionState()
-      console.log("[v0] Connection state:", connectionState) // Added debug logging
+      console.log("[v0] Connection state:", connectionState)
 
       if (connectionState !== "connected") {
         toast({
@@ -253,7 +253,7 @@ export default function Home() {
                       peers={peers}
                       onFileSelect={handleFileSelect}
                     />
-                    <PeerList peers={peers} />
+                    <PeerList peers={peers} onRefresh={refreshPeers} />
                   </>
                 ) : (
                   <div className="h-64 flex items-center justify-center">
