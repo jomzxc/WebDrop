@@ -19,7 +19,7 @@ export function useRoom(roomId: string | null) {
     if (!roomId) return
 
     try {
-      const { data, error } = await supabase
+      const { data: peersData, error: peersError } = await supabase
         .from("peers")
         .select(`
           *,
@@ -30,21 +30,29 @@ export function useRoom(roomId: string | null) {
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true })
 
-      if (error) throw error
+      if (peersError) throw peersError
 
-      if (data) {
-        const peersWithAvatars = data.map((peer: any) => ({
-          ...peer,
+      if (peersData && peersData.length > 0) {
+        // Flatten the nested profile data into the peer object
+        const peersWithAvatars = peersData.map((peer: any) => ({
+          id: peer.id,
+          room_id: peer.room_id,
+          user_id: peer.user_id,
+          username: peer.username,
+          joined_at: peer.joined_at,
+          last_seen: peer.last_seen,
           avatar_url: peer.profiles?.avatar_url || null,
-          profiles: undefined, // Remove the nested profiles object
         }))
+
         setPeers(peersWithAvatars)
+      } else {
+        setPeers([])
       }
     } catch (error) {
       console.error("Error fetching peers:", error)
       toast({
         title: "Failed to fetch peers",
-        description: "Could not load room participants",
+        description: error instanceof Error ? error.message : "Could not load room participants",
         variant: "destructive",
       })
     }
