@@ -40,10 +40,6 @@ export default function SignUpPage() {
     }
 
     try {
-      console.log("[v0] Starting sign up process...")
-      console.log("[v0] Email:", email)
-      console.log("[v0] Redirect URL:", `${window.location.origin}/auth/callback`)
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -52,31 +48,16 @@ export default function SignUpPage() {
           data: {
             username: username || email.split("@")[0],
           },
+          // Disable email confirmation requirement
+          emailConfirm: false,
         },
       })
-
-      console.log("[v0] Sign up response:", { data, error })
 
       if (error) throw error
 
       if (data.user) {
-        console.log("[v0] User created:", data.user.id)
-        console.log("[v0] Email confirmed:", data.user.email_confirmed_at)
-        console.log("[v0] Confirmation sent at:", data.user.confirmation_sent_at)
-
-        // If user is already confirmed (auto-confirm enabled), redirect to home
-        if (data.user.email_confirmed_at) {
-          console.log("[v0] User auto-confirmed, redirecting to home")
-          router.push("/")
-        } else {
-          // Email confirmation required
-          console.log("[v0] Email confirmation required, redirecting to success page")
-          router.push("/auth/sign-up-success")
-        }
-      } else {
-        console.log("[v0] No user data returned")
-        // Fallback: assume email confirmation is needed
-        router.push("/auth/sign-up-success")
+        // User is created and auto-confirmed, redirect to home
+        router.push("/")
       }
     } catch (error: unknown) {
       console.error("[v0] Sign up error:", error)
@@ -159,7 +140,7 @@ export default function SignUpPage() {
               )}
               <Button
                 type="submit"
-                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                 disabled={isLoading}
               >
                 <Mail className="w-5 h-5 mr-2" />
