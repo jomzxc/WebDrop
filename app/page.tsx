@@ -162,18 +162,6 @@ export default function LandingPage() {
                   </p>
                 </CardContent>
               </Card>
-
-              <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Lock className="w-6 h-6 text-accent" />
-                  </div>
-                  <h3 className="text-xl font-semibold">No File Limits</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Transfer files of any size. No storage quotas or restrictions.
-                  </p>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>
