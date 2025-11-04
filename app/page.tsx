@@ -381,7 +381,7 @@ export default function Home() {
   const handleFileSelect = useCallback(
     (files: FileList, peerId: string) => {
       const peer = peersRef.current.find((p) => p.user_id === peerId)
-      const connection = peerConnections.get(peerId)
+      const connection = peerConnectionsRef.current.get(peerId)
 
       console.log("[v0] 📁 File select:", {
         peer: peer?.username,
@@ -418,7 +418,7 @@ export default function Home() {
         })
       })
     },
-    [toast],
+    [toast, sendFile],
   )
 
   useEffect(() => {
