@@ -27,38 +27,50 @@ export default function Home() {
   const { peers, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(connected ? roomId : null)
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
-  const sendSignal = useCallback(
-    async (toPeerId: string, signal: any) => {
-      if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
-        console.log("[v0] Cannot send signal - channel not ready")
-        return
-      }
+  const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
-      console.log("[v0] Broadcasting signal to peer:", toPeerId, "Type:", signal.type)
+  sendSignalRef.current = async (toPeerId: string, signal: any) => {
+    if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
+      console.log("[v0] ❌ Cannot send signal - channel not ready:", {
+        hasUser: !!user,
+        hasRoomId: !!roomId,
+        hasChannel: !!signalingChannelRef.current,
+        isChannelReady,
+      })
+      return
+    }
 
-      try {
-        await signalingChannelRef.current.send({
-          type: "broadcast",
-          event: "webrtc-signal",
-          payload: {
-            fromPeerId: user.id,
-            toPeerId,
-            signal,
-          },
-        })
+    console.log("[v0] 📡 Broadcasting signal:", {
+      from: user.id.substring(0, 8),
+      to: toPeerId.substring(0, 8),
+      type: signal.type,
+    })
 
-        console.log("[v0] Signal broadcast successfully")
-      } catch (error) {
-        console.error("[v0] Failed to broadcast signal:", error)
-        toast({
-          title: "Signaling error",
-          description: "Failed to send connection signal",
-          variant: "destructive",
-        })
-      }
-    },
-    [user, roomId, isChannelReady, toast],
-  )
+    try {
+      await signalingChannelRef.current.send({
+        type: "broadcast",
+        event: "webrtc-signal",
+        payload: {
+          fromPeerId: user.id,
+          toPeerId,
+          signal,
+        },
+      })
+
+      console.log("[v0] ✅ Signal broadcast successfully")
+    } catch (error) {
+      console.error("[v0] ❌ Failed to broadcast signal:", error)
+      toast({
+        title: "Signaling error",
+        description: "Failed to send connection signal",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const sendSignal = useCallback((toPeerId: string, signal: any) => {
+    return sendSignalRef.current?.(toPeerId, signal) || Promise.resolve()
+  }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user }, error }) => {
@@ -66,6 +78,7 @@ export default function Home() {
         router.push("/auth/login")
       } else {
         setUser(user)
+        console.log("[v0] 👤 User authenticated:", user.id.substring(0, 8))
       }
       setIsAuthLoading(false)
     })
@@ -77,11 +90,11 @@ export default function Home() {
       return
     }
 
-    console.log("[v0] Setting up signaling channel for room:", roomId)
+    console.log("[v0] 🔌 Setting up signaling channel for room:", roomId)
 
     const channel = supabase.channel(`room:${roomId}`, {
       config: {
-        broadcast: { self: false, ack: true },
+        broadcast: { self: false },
       },
     })
 
@@ -89,39 +102,53 @@ export default function Home() {
       .on("broadcast", { event: "webrtc-signal" }, async (payload) => {
         const { fromPeerId, toPeerId, signal } = payload.payload
 
-        if (toPeerId !== user.id) return
+        console.log("[v0] 📨 Received broadcast:", {
+          from: fromPeerId.substring(0, 8),
+          to: toPeerId.substring(0, 8),
+          type: signal.type,
+          isForMe: toPeerId === user.id,
+        })
 
-        console.log("[v0] Received signal:", signal.type, "from:", fromPeerId)
+        if (toPeerId !== user.id) {
+          console.log("[v0] ⏭️  Signal not for me, ignoring")
+          return
+        }
+
         const connection = peerConnections.get(fromPeerId)
 
         if (!connection) {
-          console.error("[v0] No connection found for peer:", fromPeerId)
+          console.error("[v0] ❌ No connection found for peer:", fromPeerId.substring(0, 8))
+          console.log(
+            "[v0] Available connections:",
+            Array.from(peerConnections.keys()).map((id) => id.substring(0, 8)),
+          )
           return
         }
 
         try {
           if (signal.type === "offer") {
-            console.log("[v0] Handling offer from:", fromPeerId)
+            console.log("[v0] 📥 Handling offer from:", fromPeerId.substring(0, 8))
             await connection.handleOffer(signal.offer)
           } else if (signal.type === "answer") {
-            console.log("[v0] Handling answer from:", fromPeerId)
+            console.log("[v0] 📥 Handling answer from:", fromPeerId.substring(0, 8))
             await connection.handleAnswer(signal.answer)
           } else if (signal.type === "ice-candidate") {
-            console.log("[v0] Handling ICE candidate from:", fromPeerId)
+            console.log("[v0] 🧊 Handling ICE candidate from:", fromPeerId.substring(0, 8))
             await connection.handleIceCandidate(signal.candidate)
           }
         } catch (error) {
-          console.error("[v0] Error handling signal:", error)
+          console.error("[v0] ❌ Error handling signal:", error)
         }
       })
       .subscribe((status) => {
-        console.log("[v0] Signaling channel status:", status)
+        console.log("[v0] 📡 Signaling channel status:", status)
         if (status === "SUBSCRIBED") {
           signalingChannelRef.current = channel
           setIsChannelReady(true)
-          console.log("[v0] Signaling channel ready")
+          console.log("[v0] ✅ Signaling channel ready")
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setIsChannelReady(false)
+          console.error("[v0] ❌ Signaling channel error:", status)
           toast({
             title: "Connection error",
             description: "Failed to establish signaling channel",
@@ -131,7 +158,7 @@ export default function Home() {
       })
 
     return () => {
-      console.log("[v0] Cleaning up signaling channel")
+      console.log("[v0] 🧹 Cleaning up signaling channel")
       setIsChannelReady(false)
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
@@ -139,72 +166,104 @@ export default function Home() {
   }, [connected, user, roomId, peerConnections, supabase, toast])
 
   useEffect(() => {
-    if (!connected || !user || !isChannelReady) return
+    if (!connected || !user || !isChannelReady) {
+      console.log("[v0] ⏸️  Not ready for peer connections:", { connected, hasUser: !!user, isChannelReady })
+      return
+    }
 
-    const currentPeers = peers.filter((p) => p.user_id !== user.id)
-    const newConnections = new Map(peerConnections)
+    console.log("[v0] 👥 Processing peers:", peers.length)
 
-    currentPeers.forEach((peer) => {
-      if (!newConnections.has(peer.user_id)) {
-        console.log("[v0] Creating connection to peer:", peer.username, "Initiator:", user.id < peer.user_id)
+    // Add a small delay to ensure the other peer's signaling channel is also ready
+    const timer = setTimeout(() => {
+      const currentPeers = peers.filter((p) => p.user_id !== user.id)
+      const newConnections = new Map(peerConnections)
 
-        const pc = new PeerConnection(peer.user_id, user.id < peer.user_id, (signal) => {
-          sendSignal(peer.user_id, signal)
-        })
+      console.log(
+        "[v0] 🔗 Current peers to connect:",
+        currentPeers.map((p) => ({
+          id: p.user_id.substring(0, 8),
+          username: p.username,
+        })),
+      )
 
-        pc.onData((data) => {
-          if (!data || !data.type) return
-
-          if (data.type === "file-metadata") {
-            handleFileMetadata(data.metadata, peer.username)
-          } else if (data.type === "file-chunk") {
-            handleFileChunk(data.chunk)
-          } else if (data.type === "file-complete") {
-            handleFileComplete(data.fileId)
-          }
-        })
-
-        pc.onStateChange((state) => {
-          console.log("[v0] Connection state changed:", peer.username, "->", state)
-        })
-
-        pc.onError((error) => {
-          console.error("[v0] Connection error with", peer.username, ":", error)
-          toast({
-            title: "Connection error",
-            description: `Failed to connect to ${peer.username}`,
-            variant: "destructive",
+      currentPeers.forEach((peer) => {
+        if (!newConnections.has(peer.user_id)) {
+          const isInitiator = user.id < peer.user_id
+          console.log("[v0] 🆕 Creating connection to peer:", {
+            username: peer.username,
+            peerId: peer.user_id.substring(0, 8),
+            isInitiator,
           })
-        })
 
-        if (user.id < peer.user_id) {
-          console.log("[v0] Creating offer for peer:", peer.username)
-          pc.createOffer().catch((error) => {
-            console.error("[v0] Failed to create offer:", error)
+          const pc = new PeerConnection(peer.user_id, isInitiator, (signal) => {
+            console.log("[v0] 📤 PeerConnection wants to send signal:", signal.type)
+            sendSignal(peer.user_id, signal)
+          })
+
+          pc.onData((data) => {
+            if (!data || !data.type) return
+
+            if (data.type === "file-metadata") {
+              handleFileMetadata(data.metadata, peer.username)
+            } else if (data.type === "file-chunk") {
+              handleFileChunk(data.chunk)
+            } else if (data.type === "file-complete") {
+              handleFileComplete(data.fileId)
+            }
+          })
+
+          pc.onStateChange((state) => {
+            console.log("[v0] 🔄 Connection state changed:", {
+              peer: peer.username,
+              peerId: peer.user_id.substring(0, 8),
+              state,
+            })
+          })
+
+          pc.onError((error) => {
+            console.error("[v0] ❌ Connection error with", peer.username, ":", error)
             toast({
-              title: "Connection failed",
-              description: "Could not establish peer connection",
+              title: "Connection error",
+              description: `Failed to connect to ${peer.username}`,
               variant: "destructive",
             })
           })
+
+          newConnections.set(peer.user_id, pc)
+
+          if (isInitiator) {
+            console.log("[v0] 🚀 Creating offer for peer:", peer.username)
+            // Add a small delay before creating offer to ensure signaling is fully ready
+            setTimeout(() => {
+              pc.createOffer().catch((error) => {
+                console.error("[v0] ❌ Failed to create offer:", error)
+                toast({
+                  title: "Connection failed",
+                  description: "Could not establish peer connection",
+                  variant: "destructive",
+                })
+              })
+            }, 500)
+          } else {
+            console.log("[v0] ⏳ Waiting for offer from peer:", peer.username)
+          }
         }
+      })
 
-        newConnections.set(peer.user_id, pc)
-      }
-    })
+      // Clean up removed peers
+      Array.from(newConnections.keys()).forEach((peerId) => {
+        if (!peers.find((p) => p.user_id === peerId)) {
+          console.log("[v0] 🗑️  Closing connection to peer:", peerId.substring(0, 8))
+          newConnections.get(peerId)?.close()
+          newConnections.delete(peerId)
+        }
+      })
 
-    Array.from(newConnections.keys()).forEach((peerId) => {
-      if (!peers.find((p) => p.user_id === peerId)) {
-        console.log("[v0] Closing connection to peer:", peerId)
-        newConnections.get(peerId)?.close()
-        newConnections.delete(peerId)
-      }
-    })
-
-    setPeerConnections(newConnections)
+      setPeerConnections(newConnections)
+    }, 1000) // Wait 1 second to ensure both peers have signaling ready
 
     return () => {
-      newConnections.forEach((conn) => conn.close())
+      clearTimeout(timer)
     }
   }, [
     peers,
@@ -218,23 +277,38 @@ export default function Home() {
     sendSignal,
   ])
 
+  useEffect(() => {
+    return () => {
+      peerConnections.forEach((conn) => {
+        console.log("[v0] 🧹 Cleaning up peer connection")
+        conn.close()
+      })
+    }
+  }, [peerConnections])
+
   const handleJoinRoom = async (id: string) => {
     try {
       let finalRoomId = id
 
       if (id === "create") {
+        console.log("[v0] 🏗️  Creating new room")
         finalRoomId = await createRoom()
       } else {
+        console.log("[v0] 🚪 Joining room:", id)
         await joinRoom(id)
         finalRoomId = id
       }
 
       setRoomId(finalRoomId)
       setConnected(true)
-    } catch (error: any) {}
+      console.log("[v0] ✅ Connected to room:", finalRoomId)
+    } catch (error: any) {
+      console.error("[v0] ❌ Failed to join room:", error)
+    }
   }
 
   const handleLeaveRoom = async () => {
+    console.log("[v0] 👋 Leaving room")
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
     setIsChannelReady(false)
@@ -249,7 +323,12 @@ export default function Home() {
       const peer = peers.find((p) => p.user_id === peerId)
       const connection = peerConnections.get(peerId)
 
-      console.log("[v0] File select - Peer:", peer?.username, "Connection:", connection?.getConnectionState())
+      console.log("[v0] 📁 File select:", {
+        peer: peer?.username,
+        peerId: peerId.substring(0, 8),
+        hasConnection: !!connection,
+        connectionState: connection?.getConnectionState(),
+      })
 
       if (!peer || !connection) {
         toast({
@@ -261,7 +340,7 @@ export default function Home() {
       }
 
       const connectionState = connection.getConnectionState()
-      console.log("[v0] Connection state:", connectionState)
+      console.log("[v0] 🔍 Connection state check:", connectionState)
 
       if (connectionState !== "connected") {
         toast({
@@ -272,6 +351,7 @@ export default function Home() {
         return
       }
 
+      console.log("[v0] ✅ Starting file transfer")
       Array.from(files).forEach((file) => {
         sendFile(file, peerId, peer.username, (data) => {
           connection.sendData(data)
