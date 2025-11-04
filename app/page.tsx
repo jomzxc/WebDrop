@@ -21,6 +21,7 @@ export default function Home() {
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const signalingChannelRef = useRef<RealtimeChannel | null>(null)
   const [isChannelReady, setIsChannelReady] = useState(false)
+  const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map())
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -28,6 +29,10 @@ export default function Home() {
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
+
+  useEffect(() => {
+    peerConnectionsRef.current = peerConnections
+  }, [peerConnections])
 
   sendSignalRef.current = async (toPeerId: string, signal: any) => {
     if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
@@ -113,13 +118,13 @@ export default function Home() {
         return
       }
 
-      const connection = peerConnections.get(fromPeerId)
+      const connection = peerConnectionsRef.current.get(fromPeerId)
 
       if (!connection) {
         console.error("[v0] ❌ No connection found for peer:", fromPeerId.substring(0, 8))
         console.log(
           "[v0] Available connections:",
-          Array.from(peerConnections.keys()).map((id) => id.substring(0, 8)),
+          Array.from(peerConnectionsRef.current.keys()).map((id) => id.substring(0, 8)),
         )
         return
       }
@@ -140,7 +145,6 @@ export default function Home() {
       }
     })
 
-    // Subscribe and set ready immediately
     channel.subscribe((status) => {
       console.log("[v0] 📡 Signaling channel subscription status:", status)
 
@@ -163,7 +167,7 @@ export default function Home() {
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
     }
-  }, [connected, user, roomId, peerConnections, supabase, toast])
+  }, [connected, user, roomId])
 
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
