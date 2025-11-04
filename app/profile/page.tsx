@@ -71,6 +71,10 @@ export default function ProfilePage() {
     const providerAvatar = user.user_metadata?.avatar_url
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
+    console.log("[v0] Profile data:", profileData)
+    console.log("[v0] Avatar URL:", profileData?.avatar_url)
+    console.log("[v0] Is premade avatar:", profileData?.avatar_url?.startsWith("bg-"))
+
     if (profileData) {
       if (!profileData.avatar_url && providerAvatar) {
         const { data: updatedProfile } = await supabase
@@ -297,13 +301,16 @@ export default function ProfilePage() {
               {/* Current Avatar Preview */}
               <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-muted/20 border border-border/50">
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  {!isPremadeAvatar && (
-                    <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
+                  {currentAvatar && !isPremadeAvatar && (
+                    <AvatarImage
+                      src={currentAvatar || "/placeholder.svg"}
+                      alt={username || user.email || "User avatar"}
+                    />
                   )}
                   <AvatarFallback
                     className={cn(
                       "text-3xl font-semibold text-white",
-                      isPremadeAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
+                      isPremadeAvatar && currentAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
                     )}
                   >
                     {getInitials(username, user.email)}

@@ -58,6 +58,8 @@ export default function Header() {
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
+    console.log("[v0] Header - Profile data:", data)
+    console.log("[v0] Header - Avatar URL:", data?.avatar_url)
     setProfile(data)
   }
 
@@ -112,16 +114,18 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-10 w-10 border-2 border-primary/20">
-                      {!isPremadeAvatar && (
+                      {profile?.avatar_url && !isPremadeAvatar && (
                         <AvatarImage
-                          src={profile?.avatar_url || "/placeholder.svg"}
-                          alt={profile?.username || user.email}
+                          src={profile.avatar_url || "/placeholder.svg"}
+                          alt={profile?.username || user.email || "User avatar"}
                         />
                       )}
                       <AvatarFallback
                         className={cn(
-                          "bg-gradient-to-br from-primary to-accent text-white font-semibold",
-                          isPremadeAvatar && profile.avatar_url,
+                          "text-white font-semibold",
+                          isPremadeAvatar && profile?.avatar_url
+                            ? profile.avatar_url
+                            : "bg-gradient-to-br from-primary to-accent",
                         )}
                       >
                         {getInitials(profile?.username, user.email)}
