@@ -15,9 +15,16 @@ interface FileTransferPanelProps {
   transfers: Transfer[]
   peers: Peer[]
   onFileSelect: (files: FileList, peerId: string) => void
+  currentUserId: string
 }
 
-export default function FileTransferPanel({ roomId, transfers, peers, onFileSelect }: FileTransferPanelProps) {
+export default function FileTransferPanel({
+  roomId,
+  transfers,
+  peers,
+  onFileSelect,
+  currentUserId,
+}: FileTransferPanelProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedPeer, setSelectedPeer] = useState<string>("")
   const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
@@ -62,8 +69,7 @@ export default function FileTransferPanel({ roomId, transfers, peers, onFileSele
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
 
-  // Filter out current user from peer list
-  const availablePeers = peers.filter((p) => p.user_id !== peers[0]?.user_id)
+  const availablePeers = peers.filter((p) => p.user_id !== currentUserId)
 
   return (
     <Card className="p-8 space-y-6 backdrop-blur-xl border border-border/50 bg-card/40 shadow-2xl rounded-2xl overflow-hidden">
