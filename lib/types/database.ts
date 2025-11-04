@@ -18,6 +18,7 @@ export interface Peer {
   room_id: string
   user_id: string
   username: string
+  avatar_url: string | null
   joined_at: string
   last_seen: string
 }
