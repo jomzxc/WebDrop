@@ -18,6 +18,7 @@ export default function Home() {
   const [connected, setConnected] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [peerConnections, setPeerConnections] = useState<Map<string, PeerConnection>>(new Map())
+  const [peerConnectionStates, setPeerConnectionStates] = useState<Map<string, string>>(new Map())
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const signalingChannelRef = useRef<RealtimeChannel | null>(null)
   const [isChannelReady, setIsChannelReady] = useState(false)
@@ -75,6 +76,7 @@ export default function Home() {
           peerId: peerId.substring(0, 8),
           state,
         })
+        setPeerConnectionStates((prevStates) => new Map(prevStates).set(peerId, state))
       })
 
       pc.onError((error) => {
@@ -259,6 +261,8 @@ export default function Home() {
       const currentPeers = peers.filter((p) => p.user_id !== user.id)
       // Read from the ref to get the most current map
       const newConnections = new Map(peerConnectionsRef.current)
+      // --- Create a new map for the connection states ---
+      const newStates = new Map(peerConnectionStates)
 
       console.log(
         "[v0] 🔗 Current peers to connect:",
@@ -275,6 +279,8 @@ export default function Home() {
           const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
           if (pc) {
             newConnections.set(peer.user_id, pc)
+            // --- Set initial state to 'new' ---
+            newStates.set(peer.user_id, "new")
 
             // Now, check for and process any buffered signals for this new peer
             const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
@@ -321,12 +327,16 @@ export default function Home() {
           console.log("[v0] 🗑️  Peer left, closing connection:", peerId.substring(0, 8))
           newConnections.get(peerId)?.close()
           newConnections.delete(peerId)
+          // --- Remove peer from states map ---
+          newStates.delete(peerId)
           pendingSignalsRef.current.delete(peerId)
         }
       })
 
       // Update the state, which will trigger the ref update
       setPeerConnections(newConnections)
+      // --- Update the states map ---
+      setPeerConnectionStates(newStates)
       previousPeerIdsRef.current = currentPeerIds
     }, 1000) // 1s debounce to prevent churn
 
@@ -372,6 +382,8 @@ export default function Home() {
     console.log("[v0] 👋 Leaving room")
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
+    // --- Clear connection states on leave ---
+    setPeerConnectionStates(new Map())
     previousPeerIdsRef.current = new Set()
     pendingSignalsRef.current.clear()
     setIsChannelReady(false)
@@ -438,6 +450,8 @@ export default function Home() {
     })
   }, [router, supabase])
 
+  const isReadyToTransfer = Array.from(peerConnectionStates.values()).some((state) => state === "connected")
+
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -471,6 +485,8 @@ export default function Home() {
                   connected={connected}
                   roomId={roomId}
                   isLoading={isLoading}
+                  // --- Pass new prop ---
+                  isReadyToTransfer={isReadyToTransfer}
                 />
               </div>
 
@@ -484,7 +500,13 @@ export default function Home() {
                       onFileSelect={handleFileSelect}
                       currentUserId={user.id}
                     />
-                    <PeerList peers={peersRef.current} onRefresh={refreshPeersRef.current} />
+                    <PeerList
+                      peers={peersRef.current}
+                      onRefresh={refreshPeersRef.current}
+                      // --- Pass new props ---
+                      currentUserId={user.id}
+                      connectionStates={peerConnectionStates}
+                    />
                   </>
                 ) : (
                   <div className="h-64 flex items-center justify-center">
