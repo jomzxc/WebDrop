@@ -39,6 +39,7 @@ export async function POST() {
       user_id: user.id,
       username: profile?.username || user.email?.split("@")[0] || "Anonymous",
       avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || null,
+      last_seen: new Date().toISOString(),
     })
 
     if (peerError) {
