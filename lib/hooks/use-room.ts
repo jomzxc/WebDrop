@@ -2,27 +2,40 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 import type { PeerConnection } from "@/lib/webrtc/peer-connection"
 import type { Peer } from "@/lib/types/database"
 
 export function useRoom(roomId: string | null) {
   const [peers, setPeers] = useState<Peer[]>([])
   const [connections, setConnections] = useState<Map<string, PeerConnection>>(new Map())
+  const [isLoading, setIsLoading] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
 
   const fetchPeers = useCallback(async () => {
     if (!roomId) return
 
-    const { data } = await supabase
-      .from("peers")
-      .select("*")
-      .eq("room_id", roomId)
-      .order("joined_at", { ascending: true })
+    try {
+      const { data, error } = await supabase
+        .from("peers")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("joined_at", { ascending: true })
 
-    if (data) {
-      setPeers(data)
+      if (error) throw error
+
+      if (data) {
+        setPeers(data)
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to fetch peers",
+        description: "Could not load room participants",
+        variant: "destructive",
+      })
     }
-  }, [roomId, supabase])
+  }, [roomId, supabase, toast])
 
   useEffect(() => {
     if (!roomId) return
@@ -52,39 +65,121 @@ export function useRoom(roomId: string | null) {
   }, [roomId, fetchPeers, supabase])
 
   const createRoom = async () => {
-    const response = await fetch("/api/rooms/create", {
-      method: "POST",
-    })
-    const data = await response.json()
-    return data.room?.id
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/rooms/create", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to create room")
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      toast({
+        title: "Room created",
+        description: `Room ID: ${data.room?.id}`,
+      })
+
+      return data.room?.id
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create room"
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const joinRoom = async (id: string) => {
-    const response = await fetch("/api/rooms/join", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomId: id }),
-    })
-    const data = await response.json()
-    if (data.error) throw new Error(data.error)
-    return data.room
+    if (!id || id.length !== 8) {
+      throw new Error("Invalid room ID. Must be 8 characters.")
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/rooms/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: id.toUpperCase() }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to join room")
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      toast({
+        title: "Joined room",
+        description: `Connected to room ${id}`,
+      })
+
+      return data.room
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to join room"
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const leaveRoom = async (id: string) => {
-    // Close all peer connections
-    connections.forEach((conn) => conn.close())
-    setConnections(new Map())
+    setIsLoading(true)
+    try {
+      // Close all peer connections
+      connections.forEach((conn) => conn.close())
+      setConnections(new Map())
 
-    await fetch("/api/rooms/leave", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomId: id }),
-    })
+      const response = await fetch("/api/rooms/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: id }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to leave room")
+      }
+
+      setPeers([])
+
+      toast({
+        title: "Left room",
+        description: "Disconnected from room",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to leave room properly",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return {
     peers,
     connections,
+    isLoading,
     createRoom,
     joinRoom,
     leaveRoom,

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react"
 import { FileTransferManager } from "@/lib/webrtc/file-transfer"
 import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 
 export interface Transfer {
   id: string
@@ -15,10 +16,13 @@ export interface Transfer {
   peerName?: string
 }
 
+const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
+
 export function useFileTransfer(roomId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const transferManager = useRef(new FileTransferManager())
   const supabase = createClient()
+  const { toast } = useToast()
 
   const addTransfer = useCallback((transfer: Transfer) => {
     setTransfers((prev) => [...prev, transfer])
@@ -30,6 +34,24 @@ export function useFileTransfer(roomId: string) {
 
   const sendFile = useCallback(
     async (file: File, peerId: string, peerName: string, sendData: (data: any) => void) => {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `Maximum file size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!file.name || file.name.length > 255) {
+        toast({
+          title: "Invalid file name",
+          description: "File name must be between 1 and 255 characters",
+          variant: "destructive",
+        })
+        return
+      }
+
       const transferId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
 
       addTransfer({
@@ -50,6 +72,11 @@ export function useFileTransfer(roomId: string) {
 
         updateTransfer(transferId, { progress: 100, status: "completed" })
 
+        toast({
+          title: "File sent",
+          description: `${file.name} sent to ${peerName}`,
+        })
+
         // Log to database
         const {
           data: { user },
@@ -66,15 +93,38 @@ export function useFileTransfer(roomId: string) {
           })
         }
       } catch (error) {
-        console.error("[v0] File transfer error:", error)
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
         updateTransfer(transferId, { status: "failed" })
+        toast({
+          title: "Transfer failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
       }
     },
-    [addTransfer, updateTransfer, roomId, supabase],
+    [addTransfer, updateTransfer, roomId, supabase, toast],
   )
 
   const handleFileMetadata = useCallback(
     (metadata: any, peerName: string) => {
+      if (!metadata?.id || !metadata?.name || !metadata?.size) {
+        toast({
+          title: "Invalid file metadata",
+          description: "Received invalid file information",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (metadata.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${peerName} tried to send a file larger than ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+          variant: "destructive",
+        })
+        return
+      }
+
       transferManager.current.receiveMetadata(metadata)
 
       addTransfer({
@@ -86,39 +136,65 @@ export function useFileTransfer(roomId: string) {
         direction: "receiving",
         peerName,
       })
+
+      toast({
+        title: "Receiving file",
+        description: `${metadata.name} from ${peerName}`,
+      })
     },
-    [addTransfer],
+    [addTransfer, toast],
   )
 
   const handleFileChunk = useCallback(
     (chunk: any) => {
-      transferManager.current.receiveChunk(chunk, (fileId, progress) => {
-        updateTransfer(fileId, { progress })
-      })
+      try {
+        transferManager.current.receiveChunk(chunk, (fileId, progress) => {
+          updateTransfer(fileId, { progress })
+        })
+      } catch (error) {
+        toast({
+          title: "Transfer error",
+          description: "Failed to receive file chunk",
+          variant: "destructive",
+        })
+      }
     },
-    [updateTransfer],
+    [updateTransfer, toast],
   )
 
   const handleFileComplete = useCallback(
     (fileId: string) => {
-      const blob = transferManager.current.completeTransfer(fileId)
-      const metadata = transferManager.current.getMetadata(fileId)
+      try {
+        const blob = transferManager.current.completeTransfer(fileId)
+        const metadata = transferManager.current.getMetadata(fileId)
 
-      if (blob && metadata) {
-        // Trigger download
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = metadata.name
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        if (blob && metadata) {
+          // Trigger download
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = metadata.name
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
 
-        updateTransfer(fileId, { progress: 100, status: "completed" })
+          updateTransfer(fileId, { progress: 100, status: "completed" })
+
+          toast({
+            title: "File received",
+            description: `${metadata.name} downloaded successfully`,
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "Download failed",
+          description: "Failed to save received file",
+          variant: "destructive",
+        })
       }
     },
-    [updateTransfer],
+    [updateTransfer, toast],
   )
 
   return {

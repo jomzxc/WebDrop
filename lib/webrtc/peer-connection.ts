@@ -3,6 +3,7 @@ export class PeerConnection {
   private dataChannel: RTCDataChannel | null = null
   private onDataCallback: ((data: any) => void) | null = null
   private onStateChangeCallback: ((state: string) => void) | null = null
+  private onErrorCallback: ((error: Error) => void) | null = null
 
   constructor(
     private peerId: string,
@@ -10,7 +11,11 @@ export class PeerConnection {
     private onSignal: (signal: any) => void,
   ) {
     this.pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+      ],
     })
 
     this.pc.onicecandidate = (event) => {
@@ -24,8 +29,18 @@ export class PeerConnection {
     }
 
     this.pc.onconnectionstatechange = () => {
-      console.log("[v0] Connection state:", this.pc.connectionState)
-      this.onStateChangeCallback?.(this.pc.connectionState)
+      const state = this.pc.connectionState
+      this.onStateChangeCallback?.(state)
+
+      if (state === "failed" || state === "disconnected") {
+        this.onErrorCallback?.(new Error(`Connection ${state}`))
+      }
+    }
+
+    this.pc.oniceconnectionstatechange = () => {
+      if (this.pc.iceConnectionState === "failed") {
+        this.onErrorCallback?.(new Error("ICE connection failed"))
+      }
     }
 
     if (this.isInitiator) {
@@ -49,51 +64,85 @@ export class PeerConnection {
     if (!this.dataChannel) return
 
     this.dataChannel.onopen = () => {
-      console.log("[v0] Data channel opened")
+      this.onStateChangeCallback?.("connected")
     }
 
     this.dataChannel.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      this.onDataCallback?.(data)
+      try {
+        const data = JSON.parse(event.data)
+        this.onDataCallback?.(data)
+      } catch (error) {
+        this.onErrorCallback?.(new Error("Failed to parse data channel message"))
+      }
     }
 
     this.dataChannel.onerror = (error) => {
-      console.error("[v0] Data channel error:", error)
+      this.onErrorCallback?.(new Error("Data channel error"))
+    }
+
+    this.dataChannel.onclose = () => {
+      this.onStateChangeCallback?.("closed")
     }
   }
 
   async createOffer() {
-    const offer = await this.pc.createOffer()
-    await this.pc.setLocalDescription(offer)
-    this.onSignal({
-      type: "offer",
-      offer,
-      peerId: this.peerId,
-    })
+    try {
+      const offer = await this.pc.createOffer()
+      await this.pc.setLocalDescription(offer)
+      this.onSignal({
+        type: "offer",
+        offer,
+        peerId: this.peerId,
+      })
+    } catch (error) {
+      this.onErrorCallback?.(new Error("Failed to create offer"))
+      throw error
+    }
   }
 
   async handleOffer(offer: RTCSessionDescriptionInit) {
-    await this.pc.setRemoteDescription(offer)
-    const answer = await this.pc.createAnswer()
-    await this.pc.setLocalDescription(answer)
-    this.onSignal({
-      type: "answer",
-      answer,
-      peerId: this.peerId,
-    })
+    try {
+      await this.pc.setRemoteDescription(offer)
+      const answer = await this.pc.createAnswer()
+      await this.pc.setLocalDescription(answer)
+      this.onSignal({
+        type: "answer",
+        answer,
+        peerId: this.peerId,
+      })
+    } catch (error) {
+      this.onErrorCallback?.(new Error("Failed to handle offer"))
+      throw error
+    }
   }
 
   async handleAnswer(answer: RTCSessionDescriptionInit) {
-    await this.pc.setRemoteDescription(answer)
+    try {
+      await this.pc.setRemoteDescription(answer)
+    } catch (error) {
+      this.onErrorCallback?.(new Error("Failed to handle answer"))
+      throw error
+    }
   }
 
   async handleIceCandidate(candidate: RTCIceCandidateInit) {
-    await this.pc.addIceCandidate(candidate)
+    try {
+      await this.pc.addIceCandidate(candidate)
+    } catch (error) {
+      this.onErrorCallback?.(new Error("Failed to add ICE candidate"))
+      throw error
+    }
   }
 
   sendData(data: any) {
     if (this.dataChannel && this.dataChannel.readyState === "open") {
-      this.dataChannel.send(JSON.stringify(data))
+      try {
+        this.dataChannel.send(JSON.stringify(data))
+      } catch (error) {
+        this.onErrorCallback?.(new Error("Failed to send data"))
+      }
+    } else {
+      this.onErrorCallback?.(new Error("Data channel not open"))
     }
   }
 
@@ -105,8 +154,16 @@ export class PeerConnection {
     this.onStateChangeCallback = callback
   }
 
+  onError(callback: (error: Error) => void) {
+    this.onErrorCallback = callback
+  }
+
   close() {
     this.dataChannel?.close()
     this.pc.close()
+  }
+
+  getConnectionState(): RTCPeerConnectionState {
+    return this.pc.connectionState
   }
 }

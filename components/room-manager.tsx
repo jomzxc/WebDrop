@@ -11,27 +11,53 @@ interface RoomManagerProps {
   onLeaveRoom: () => void
   connected: boolean
   roomId: string
+  isLoading?: boolean
 }
 
-export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId }: RoomManagerProps) {
+export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId, isLoading }: RoomManagerProps) {
   const [inputValue, setInputValue] = useState("")
   const [copied, setCopied] = useState(false)
 
   const handleCreateRoom = () => {
+    if (isLoading) return
     onJoinRoom("create")
   }
 
   const handleJoinRoom = () => {
-    if (inputValue.trim()) {
-      onJoinRoom(inputValue.trim())
-      setInputValue("")
+    if (!inputValue.trim()) return
+
+    const trimmedValue = inputValue.trim().toUpperCase()
+
+    if (trimmedValue.length !== 8) {
+      return
     }
+
+    if (!/^[A-Z0-9]+$/.test(trimmedValue)) {
+      return
+    }
+
+    if (isLoading) return
+
+    onJoinRoom(trimmedValue)
+    setInputValue("")
   }
 
-  const handleCopyRoomId = () => {
-    navigator.clipboard.writeText(roomId)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      // Fallback for browsers that don't support clipboard API
+      const textArea = document.createElement("textarea")
+      textArea.value = roomId
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   return (
@@ -55,10 +81,20 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
           <div className="space-y-4">
             <Button
               onClick={handleCreateRoom}
-              className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground py-6 text-lg font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground py-6 text-lg font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <Plus className="w-5 h-5 mr-2" />
-              Create New Room
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create New Room
+                </>
+              )}
             </Button>
 
             <div className="relative my-5">
@@ -78,14 +114,22 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
                 onKeyPress={(e) => e.key === "Enter" && handleJoinRoom()}
                 className="px-4 py-3 text-base rounded-xl transition-all bg-muted/40 border-border/50 focus:border-accent/50 focus:bg-muted/60 placeholder-muted-foreground/50"
                 maxLength={8}
+                disabled={isLoading}
               />
               <Button
                 onClick={handleJoinRoom}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || inputValue.trim().length !== 8 || isLoading}
                 variant="outline"
-                className="w-full py-3 rounded-xl border-border/50 hover:bg-muted/50 transition-all disabled:opacity-50 bg-transparent"
+                className="w-full py-3 rounded-xl border-border/50 hover:bg-muted/50 transition-all disabled:opacity-50 bg-transparent disabled:cursor-not-allowed"
               >
-                Join Room
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                    Joining...
+                  </>
+                ) : (
+                  "Join Room"
+                )}
               </Button>
             </div>
           </div>
@@ -100,6 +144,7 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
                   variant="ghost"
                   size="sm"
                   className="text-accent hover:bg-accent/20 transition-all hover:scale-110"
+                  aria-label="Copy room ID"
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
@@ -117,7 +162,8 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
 
             <Button
               onClick={onLeaveRoom}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40 hover:border-red-500/60 transition-all font-semibold"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-red-500/20 to-red-500/10 hover:from-red-500/30 hover:to-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40 hover:border-red-500/60 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Leave Room

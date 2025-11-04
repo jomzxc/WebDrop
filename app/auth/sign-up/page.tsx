@@ -40,7 +40,7 @@ export default function SignUpPage() {
     }
 
     try {
-      const redirectTo = process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`
+      const redirectTo = `${window.location.origin}/auth/callback`
 
       const { data, error } = await supabase.auth.signUp({
         email,
