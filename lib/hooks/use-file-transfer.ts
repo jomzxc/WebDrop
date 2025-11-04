@@ -32,6 +32,11 @@ export function useFileTransfer(roomId: string) {
     setTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
   }, [])
 
+  const clearTransfers = useCallback(() => {
+    setTransfers([])
+    transferManager.current.clearPendingTransfers()
+  }, [])
+
   const sendFile = useCallback(
     async (file: File, peerId: string, peerName: string, sendData: (data: any) => void) => {
       if (file.size > MAX_FILE_SIZE) {
@@ -212,5 +217,6 @@ export function useFileTransfer(roomId: string) {
     handleFileMetadata,
     handleFileChunk,
     handleFileComplete,
+    clearTransfers,
   }
 }
