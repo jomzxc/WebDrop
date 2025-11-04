@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     }
 
     // Get user profile
-    const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("username, avatar_url").eq("id", user.id).single()
 
     const { data: existingPeer } = await supabase
       .from("peers")
@@ -56,7 +56,10 @@ export async function POST(request: Request) {
     if (existingPeer) {
       const { error: updateError } = await supabase
         .from("peers")
-        .update({ last_seen: new Date().toISOString() })
+        .update({
+          last_seen: new Date().toISOString(),
+          avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || null,
+        })
         .eq("id", existingPeer.id)
 
       if (updateError) {
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         username: profile?.username || user.email?.split("@")[0] || "Anonymous",
         last_seen: new Date().toISOString(),
+        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || null,
       })
       .select()
       .single()
@@ -81,8 +85,6 @@ export async function POST(request: Request) {
       console.error("Failed to create peer:", peerError)
       return NextResponse.json({ error: "Failed to join room" }, { status: 500 })
     }
-
-    console.log("[v0] Peer joined room:", newPeer)
 
     return NextResponse.json({ room, peer: newPeer })
   } catch (error) {
