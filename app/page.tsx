@@ -44,6 +44,27 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    const handleUnload = () => {
+      // Only run this logic if the user is actually in a room
+      if (connected && roomId) {
+        // We must use navigator.sendBeacon for a reliable "fire-and-forget"
+        // request that runs as the page is closing.
+        // We can't use an async fetch here, as the browser won't wait for it.
+        const data = new Blob([JSON.stringify({ roomId })], { type: "application/json" })
+        navigator.sendBeacon("/api/rooms/leave", data)
+      }
+    }
+
+    // Add the event listener when the component mounts
+    window.addEventListener("beforeunload", handleUnload)
+
+    // Return a cleanup function to remove the listener
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload)
+    }
+  }, [connected, roomId]) // Dependencies: ensure the handler has the current room state
+
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
       const pc = new PeerConnection(peerId, isInitiator, (signal) => {
