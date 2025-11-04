@@ -12,9 +12,17 @@ interface RoomManagerProps {
   connected: boolean
   roomId: string
   isLoading?: boolean
+  isReadyToTransfer?: boolean
 }
 
-export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId, isLoading }: RoomManagerProps) {
+export default function RoomManager({
+  onJoinRoom,
+  onLeaveRoom,
+  connected,
+  roomId,
+  isLoading,
+  isReadyToTransfer,
+}: RoomManagerProps) {
   const [inputValue, setInputValue] = useState("")
   const [copied, setCopied] = useState(false)
 
@@ -152,11 +160,23 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
               {copied && <p className="text-xs text-accent mt-3 font-semibold animate-pulse">✓ Copied to clipboard</p>}
             </div>
 
-            <div className="flex gap-3 p-4 bg-gradient-to-r from-green-500/15 to-green-500/5 border border-green-500/40 rounded-xl">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 mt-1 flex-shrink-0 animate-pulse" />
+            <div
+              className={`flex gap-3 p-4 ${
+                isReadyToTransfer
+                  ? "from-green-500/15 to-green-500/5 border-green-500/40"
+                  : "from-yellow-500/15 to-yellow-500/5 border-yellow-500/40"
+              } border rounded-xl`}
+            >
+              <div
+                className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${
+                  isReadyToTransfer ? "bg-green-500 animate-pulse" : "bg-yellow-500"
+                }`}
+              />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Connected</p>
-                <p className="text-xs text-muted-foreground">Ready to transfer files</p>
+                <p className="text-xs text-muted-foreground">
+                  {isReadyToTransfer ? "Ready to transfer files" : "Waiting for peers to connect..."}
+                </p>
               </div>
             </div>
 
