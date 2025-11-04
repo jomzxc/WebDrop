@@ -8,11 +8,12 @@ import type { Peer } from "@/lib/types/database"
 
 export function useRoom(roomId: string | null) {
   const [peers, setPeers] = useState<Peer[]>([])
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set())
+
   const [connections, setConnections] = useState<Map<string, PeerConnection>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
-  // Removed pollingIntervalRef
 
   const fetchPeers = useCallback(async () => {
     if (!roomId) return
@@ -42,24 +43,34 @@ export function useRoom(roomId: string | null) {
   useEffect(() => {
     if (!roomId) {
       setPeers([])
+      setOnlineUserIds(new Set())
       return
     }
 
-    fetchPeers()
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
-    // Removed setInterval logic
+    const setupChannel = async () => {
+      // We need the user to track presence
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
 
-    const channel = supabase
-      .channel(`room:${roomId}`, {
+      // Fetch the initial list of peers
+      fetchPeers()
+
+      channel = supabase.channel(`room:${roomId}`, {
         config: {
           broadcast: { self: true },
-          presence: { key: "" },
+          // --- ADDED PRESENCE ---
+          presence: { key: user.id },
         },
       })
-      .on(
+
+      channel.on(
         "postgres_changes",
         {
-          event: "*", // Listen to all events
+          event: "*",
           schema: "public",
           table: "peers",
           filter: `room_id=eq.${roomId}`,
@@ -68,7 +79,28 @@ export function useRoom(roomId: string | null) {
           fetchPeers()
         },
       )
-      .subscribe((status, err) => {
+
+      channel
+        .on("presence", { event: "sync" }, () => {
+          // 'sync' event fires when we first join, giving us the current state
+          const state = channel!.presenceState()
+          const userIds = new Set(Object.keys(state))
+          setOnlineUserIds(userIds)
+        })
+        .on("presence", { event: "join" }, ({ newPresences }) => {
+          // A user came online
+          setOnlineUserIds((prev) => new Set([...prev, ...newPresences.map((p) => p.key)]))
+        })
+        .on("presence", { event: "leave" }, ({ leftPresences }) => {
+          // A user went offline (closed tab, lost connection)
+          setOnlineUserIds((prev) => {
+            const next = new Set(prev)
+            leftPresences.forEach((p) => next.delete(p.key))
+            return next
+          })
+        })
+
+      channel.subscribe(async (status, err) => {
         if (err) {
           console.error("Subscription error:", err)
           toast({
@@ -76,12 +108,21 @@ export function useRoom(roomId: string | null) {
             description: "Could not connect to room updates",
             variant: "destructive",
           })
+          return
+        }
+
+        if (status === "SUBSCRIBED") {
+          await channel!.track({})
         }
       })
+    }
+
+    setupChannel()
 
     return () => {
-      // Removed clearInterval logic
-      supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
     }
   }, [roomId, fetchPeers, supabase, toast])
 
@@ -197,6 +238,7 @@ export function useRoom(roomId: string | null) {
 
   return {
     peers,
+    onlineUserIds,
     connections,
     isLoading,
     createRoom,
