@@ -11,7 +11,19 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Palette, Loader2 } from "lucide-react"
+import {
+  User,
+  Mail,
+  LinkIcon,
+  Trash2,
+  Shield,
+  Github,
+  CheckCircle2,
+  Upload,
+  Palette,
+  Loader2,
+  Check,
+} from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
@@ -37,7 +49,6 @@ export default function ProfilePage() {
   const supabase = createClient()
 
   const [isUploading, setIsUploading] = useState(false)
-  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -146,6 +157,12 @@ export default function ProfilePage() {
       const newAvatarUrl = `${data.publicUrl}?t=${new Date().getTime()}`
 
       await updateAvatarUrl(newAvatarUrl)
+      setMessage({ type: "success", text: "Avatar updated successfully!" })
+
+      // Reset file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } catch (error: any) {
       setMessage({ type: "error", text: error.message || "Failed to upload avatar" })
     } finally {
@@ -154,11 +171,16 @@ export default function ProfilePage() {
   }
 
   const handleSelectPremade = async (gradientClass: string) => {
-    setSelectedAvatar(gradientClass)
+    setIsUploading(true)
+    setMessage(null)
+
     try {
       await updateAvatarUrl(gradientClass)
+      setMessage({ type: "success", text: "Avatar updated successfully!" })
     } catch (error: any) {
       setMessage({ type: "error", text: error.message || "Failed to select avatar" })
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -192,8 +214,10 @@ export default function ProfilePage() {
             0.8,
           )
         }
+        img.onerror = () => reject(new Error("Failed to load image"))
         img.src = e.target?.result as string
       }
+      reader.onerror = () => reject(new Error("Failed to read file"))
       reader.readAsDataURL(file)
     })
   }
@@ -227,6 +251,7 @@ export default function ProfilePage() {
   if (!user) return null
 
   const isPremadeAvatar = profile?.avatar_url?.startsWith("bg-")
+  const currentAvatar = profile?.avatar_url
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -264,37 +289,117 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5 text-primary" />
-                Profile Information
+                Profile Picture
               </CardTitle>
-              <CardDescription>Update your profile details</CardDescription>
+              <CardDescription>Choose a gradient avatar or upload your own image</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center gap-6">
-                <a href="#change-avatar" className="relative group cursor-pointer" aria-label="Change profile picture">
-                  <Avatar className="h-20 w-20 border-4 border-primary/20">
-                    {!isPremadeAvatar && (
-                      <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={username || user.email} />
+              {/* Current Avatar Preview */}
+              <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-muted/20 border border-border/50">
+                <Avatar className="h-24 w-24 border-4 border-primary/20">
+                  {!isPremadeAvatar && (
+                    <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
+                  )}
+                  <AvatarFallback
+                    className={cn(
+                      "text-3xl font-semibold text-white",
+                      isPremadeAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
                     )}
-                    <AvatarFallback
-                      className={cn(
-                        "bg-gradient-to-br from-primary to-accent text-white text-2xl font-semibold",
-                        isPremadeAvatar && profile.avatar_url,
-                      )}
-                    >
-                      {getInitials(username, user.email)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Upload className="w-8 h-8 text-white" />
-                  </div>
-                </a>
-                <Button asChild variant="outline">
-                  <a href="#change-avatar">Change Avatar</a>
-                </Button>
+                  >
+                    {getInitials(username, user.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="text-sm text-muted-foreground">Current Avatar</p>
               </div>
 
               <Separator />
 
+              {/* Premade Avatars */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2 text-base">
+                  <Palette className="w-4 h-4" />
+                  Gradient Avatars
+                </Label>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                  {PREMADE_AVATARS.map((gradient) => {
+                    const isSelected = currentAvatar === gradient
+                    return (
+                      <button
+                        key={gradient}
+                        type="button"
+                        onClick={() => handleSelectPremade(gradient)}
+                        disabled={isUploading}
+                        className={cn(
+                          "relative h-14 w-14 rounded-full transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed",
+                          gradient,
+                          isSelected && "ring-4 ring-primary ring-offset-2 ring-offset-background scale-110",
+                        )}
+                        aria-label={`Select gradient avatar ${gradient}`}
+                      >
+                        {isSelected && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Check className="w-6 h-6 text-white drop-shadow-lg" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Upload Custom Avatar */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2 text-base">
+                  <Upload className="w-4 h-4" />
+                  Upload Custom Image
+                </Label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 bg-transparent"
+                    onClick={handleUploadClick}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose Image
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    disabled={isUploading}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Recommended: Square image, at least 150x150px. Accepts PNG, JPG, or WebP.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Profile Information
+              </CardTitle>
+              <CardDescription>Update your profile details</CardDescription>
+            </CardHeader>
+            <CardContent>
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
@@ -322,73 +427,6 @@ export default function ProfilePage() {
                   {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-
-          <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl" id="change-avatar">
-            <CardHeader>
-              <CardTitle>Change Profile Picture</CardTitle>
-              <CardDescription>Select a pre-made avatar or upload your own.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Palette className="w-4 h-4" />
-                  Select an Avatar
-                </Label>
-                <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
-                  {PREMADE_AVATARS.map((gradient) => (
-                    <button
-                      key={gradient}
-                      type="button"
-                      onClick={() => handleSelectPremade(gradient)}
-                      className={cn(
-                        "h-16 w-16 rounded-full transition-all",
-                        gradient,
-                        (selectedAvatar === gradient || profile?.avatar_url === gradient) &&
-                          "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                      )}
-                      aria-label={`Select gradient avatar ${gradient}`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  Upload Your Own
-                </Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={handleUploadClick}
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Image
-                    </>
-                  )}
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  accept="image/png, image/jpeg"
-                  disabled={isUploading}
-                />
-              </div>
             </CardContent>
           </Card>
 
