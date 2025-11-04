@@ -36,7 +36,6 @@ export default function Home() {
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
-  // --- LOAD ROOM FROM SESSIONSTORAGE ON PAGE LOAD ---
   useEffect(() => {
     const storedRoomId = sessionStorage.getItem("webdrop-roomId")
     if (storedRoomId) {
@@ -47,14 +46,7 @@ export default function Home() {
 
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
-      console.log("[v0] 🆕 Creating connection to peer:", {
-        username,
-        peerId: peerId.substring(0, 8),
-        isInitiator,
-      })
-
       const pc = new PeerConnection(peerId, isInitiator, (signal) => {
-        console.log("[v0] 📤 PeerConnection wants to send signal:", signal.type)
         sendSignalRef.current?.(peerId, signal)
       })
 
@@ -71,16 +63,11 @@ export default function Home() {
       })
 
       pc.onStateChange((state) => {
-        console.log("[v0] 🔄 Connection state changed:", {
-          peer: username,
-          peerId: peerId.substring(0, 8),
-          state,
-        })
         setPeerConnectionStates((prevStates) => new Map(prevStates).set(peerId, state))
       })
 
       pc.onError((error) => {
-        console.error("[v0] ❌ Connection error with", username, ":", error)
+        console.error("Connection error with", username, ":", error)
         toast({
           title: "Connection error",
           description: `Failed to connect to ${username}`,
@@ -111,20 +98,8 @@ export default function Home() {
 
   sendSignalRef.current = async (toPeerId: string, signal: any) => {
     if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
-      console.log("[v0] ❌ Cannot send signal - channel not ready:", {
-        hasUser: !!user,
-        hasRoomId: !!roomId,
-        hasChannel: !!signalingChannelRef.current,
-        isChannelReady,
-      })
       return
     }
-
-    console.log("[v0] 📡 Broadcasting signal:", {
-      from: user.id.substring(0, 8),
-      to: toPeerId.substring(0, 8),
-      type: signal.type,
-    })
 
     try {
       await signalingChannelRef.current.send({
@@ -136,10 +111,8 @@ export default function Home() {
           signal,
         },
       })
-
-      console.log("[v0] ✅ Signal broadcast successfully")
     } catch (error) {
-      console.error("[v0] ❌ Failed to broadcast signal:", error)
+      console.error("Failed to broadcast signal:", error)
       toast({
         title: "Signaling error",
         description: "Failed to send connection signal",
@@ -158,8 +131,6 @@ export default function Home() {
       return
     }
 
-    console.log("[v0] 🔌 Setting up signaling channel for room:", roomId)
-
     const channel = supabase.channel(`room:${roomId}:signaling`, {
       config: {
         broadcast: { self: false, ack: false },
@@ -170,17 +141,13 @@ export default function Home() {
       const { fromPeerId } = payload.payload
       if (!fromPeerId || fromPeerId === user.id) return
 
-      console.log(`[v0] 🤝 Received hello from ${fromPeerId.substring(0, 8)}`)
-
       const existingConnection = peerConnectionsRef.current.get(fromPeerId)
       if (existingConnection) {
-        console.log(`[v0] 🧹 Closing stale connection to ${fromPeerId.substring(0, 8)}`)
         existingConnection.close()
       }
 
       const peer = peersRef.current.find((p) => p.user_id === fromPeerId)
       if (!peer) {
-        console.warn(`[v0] ❓ Got hello from peer not in list: ${fromPeerId.substring(0, 8)}. Waiting for list update.`)
         return
       }
 
@@ -197,34 +164,22 @@ export default function Home() {
       setPeerConnectionStates(newStates)
 
       if (isInitiator) {
-        console.log(`[v0] 🚀 Re-creating offer for peer: ${peer.username}`)
         pc.createOffer().catch((error) => {
-          console.error("[v0] ❌ Failed to create offer:", error)
+          console.error("Failed to create offer:", error)
         })
-      } else {
-        console.log(`[v0] ⏳ Waiting for re-offer from peer: ${peer.username}`)
       }
     })
 
     channel.on("broadcast", { event: "webrtc-signal" }, async (payload) => {
       const { fromPeerId, toPeerId, signal } = payload.payload
 
-      console.log("[v0] 📨 Received broadcast:", {
-        from: fromPeerId.substring(0, 8),
-        to: toPeerId.substring(0, 8),
-        type: signal.type,
-        isForMe: toPeerId === user.id,
-      })
-
       if (toPeerId !== user.id) {
-        console.log("[v0] ⏭️  Signal not for me, ignoring")
         return
       }
 
       let connection = peerConnectionsRef.current.get(fromPeerId)
 
       if (!connection) {
-        console.log("[v0] 📦 No connection found. Buffering signal from peer:", fromPeerId.substring(0, 8))
         const buffer = pendingSignalsRef.current.get(fromPeerId) || []
         buffer.push(signal)
         pendingSignalsRef.current.set(fromPeerId, buffer)
@@ -233,46 +188,36 @@ export default function Home() {
 
       try {
         if (signal.type === "offer") {
-          console.log("[v0] 📥 Handling offer from:", fromPeerId.substring(0, 8))
           await connection.handleOffer(signal.offer)
         } else if (signal.type === "answer") {
-          console.log("[v0] 📥 Handling answer from:", fromPeerId.substring(0, 8))
           await connection.handleAnswer(signal.answer)
         } else if (signal.type === "ice-candidate") {
-          console.log("[v0] 🧊 Handling ICE candidate from:", fromPeerId.substring(0, 8))
           await connection.handleIceCandidate(signal.candidate)
         }
       } catch (error) {
-        console.error("[v0] ❌ Error handling signal:", error)
+        console.error("Error handling signal:", error)
       }
     })
 
     channel.subscribe((status) => {
-      console.log("[v0] 📡 Signaling channel subscription status:", status)
-
       if (status === "SUBSCRIBED") {
-        console.log("[v0] ✅ Signaling channel SUBSCRIBED - setting ready")
         signalingChannelRef.current = channel
         setIsChannelReady(true)
 
-
-        console.log("[v0] 📣 Broadcasting hello to room")
         channel.send({
           type: "broadcast",
           event: "webrtc-hello",
           payload: { fromPeerId: user.id },
         })
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        console.error("[v0] ❌ Signaling channel error:", status)
+        console.error("Signaling channel error:", status)
         setIsChannelReady(false)
       } else if (status === "CLOSED") {
-        console.log("[v0] 🔒 Signaling channel closed")
         setIsChannelReady(false)
       }
     })
 
     return () => {
-      console.log("[v0] 🧹 Cleaning up signaling channel")
       setIsChannelReady(false)
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
@@ -281,7 +226,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
-      console.log("[v0] ⏸️  Not ready for peer connections:", { connected, hasUser: !!user, isChannelReady })
       return
     }
 
@@ -295,24 +239,13 @@ export default function Home() {
       return
     }
 
-    console.log("[v0] 👥 Peer list changed, updating connections")
-
     const timer = setTimeout(() => {
       const currentPeers = peers.filter((p) => p.user_id !== user.id)
       const newConnections = new Map(peerConnectionsRef.current)
       const newStates = new Map(peerConnectionStates)
 
-      console.log(
-        "[v0] 🔗 Current peers to connect:",
-        currentPeers.map((p) => ({
-          id: p.user_id.substring(0, 8),
-          username: p.username,
-        })),
-      )
-
       currentPeers.forEach((peer) => {
         if (!newConnections.has(peer.user_id)) {
-          // A new peer has joined
           const isInitiator = user.id < peer.user_id
           const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
           if (pc) {
@@ -321,7 +254,6 @@ export default function Home() {
 
             const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
             if (bufferedSignals && bufferedSignals.length > 0) {
-              console.log("[v0] 📦 Processing", bufferedSignals.length, "buffered signals for peer:", peer.username)
               bufferedSignals.forEach(async (signal) => {
                 try {
                   if (signal.type === "offer") {
@@ -332,17 +264,16 @@ export default function Home() {
                     await pc.handleIceCandidate(signal.candidate)
                   }
                 } catch (error) {
-                  console.error("[v0] ❌ Error processing buffered signal:", error)
+                  console.error("Error processing buffered signal:", error)
                 }
               })
               pendingSignalsRef.current.delete(peer.user_id)
             }
 
             if (isInitiator) {
-              console.log("[v0] 🚀 Creating offer for peer:", peer.username)
               setTimeout(() => {
                 pc.createOffer().catch((error) => {
-                  console.error("[v0] ❌ Failed to create offer:", error)
+                  console.error("Failed to create offer:", error)
                   toast({
                     title: "Connection failed",
                     description: "Could not establish peer connection",
@@ -350,8 +281,6 @@ export default function Home() {
                   })
                 })
               }, 500)
-            } else {
-              console.log("[v0] ⏳ Waiting for offer from peer:", peer.username)
             }
           }
         }
@@ -359,7 +288,6 @@ export default function Home() {
 
       Array.from(newConnections.keys()).forEach((peerId) => {
         if (!currentPeerIds.has(peerId)) {
-          console.log("[v0] 🗑️  Peer left, closing connection:", peerId.substring(0, 8))
           newConnections.get(peerId)?.close()
           newConnections.delete(peerId)
           newStates.delete(peerId)
@@ -380,7 +308,6 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (peerConnectionsRef.current.size > 0) {
-        console.log("[v0] 🧹 Component unmounting, cleaning up all peer connections")
         peerConnectionsRef.current.forEach((conn) => conn.close())
       }
       pendingSignalsRef.current.clear()
@@ -392,10 +319,8 @@ export default function Home() {
       let finalRoomId = id
 
       if (id === "create") {
-        console.log("[v0] 🏗️  Creating new room")
         finalRoomId = await createRoom()
       } else {
-        console.log("[v0] 🚪 Joining room:", id)
         await joinRoom(id)
         finalRoomId = id
       }
@@ -403,14 +328,12 @@ export default function Home() {
       sessionStorage.setItem("webdrop-roomId", finalRoomId)
       setRoomId(finalRoomId)
       setConnected(true)
-      console.log("[v0] ✅ Connected to room:", finalRoomId)
     } catch (error: any) {
-      console.error("[v0] ❌ Failed to join room:", error)
+      console.error("Failed to join room:", error)
     }
   }
 
   const handleLeaveRoom = async () => {
-    console.log("[v0] 👋 Leaving room")
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
     setPeerConnectionStates(new Map())
@@ -430,13 +353,6 @@ export default function Home() {
       const peer = peersRef.current.find((p) => p.user_id === peerId)
       const connection = peerConnectionsRef.current.get(peerId)
 
-      console.log("[v0] 📁 File select:", {
-        peer: peer?.username,
-        peerId: peerId.substring(0, 8),
-        hasConnection: !!connection,
-        connectionState: connection?.getConnectionState(),
-      })
-
       if (!peer || !connection) {
         toast({
           title: "Connection not ready",
@@ -447,7 +363,6 @@ export default function Home() {
       }
 
       const connectionState = connection.getConnectionState()
-      console.log("[v0] 🔍 Connection state check:", connectionState)
 
       if (connectionState !== "connected") {
         toast({
@@ -458,7 +373,6 @@ export default function Home() {
         return
       }
 
-      console.log("[v0] ✅ Starting file transfer")
       Array.from(files).forEach((file) => {
         sendFile(file, peerId, peer.username, (data) => {
           connection.sendData(data)
@@ -474,7 +388,6 @@ export default function Home() {
         router.push("/auth/login")
       } else {
         setUser(user)
-        console.log("[v0] 👤 User authenticated:", user.id.substring(0, 8))
       }
       setIsAuthLoading(false)
     })
