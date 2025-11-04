@@ -1,28 +1,45 @@
 # WebRTC Signaling Setup
 
-## Important: Run the Signaling Table Script
+## Current Implementation
 
-The WebRTC peer-to-peer connections require a signaling table in the database to exchange connection information.
+WebDrop now uses **Supabase Realtime Broadcast** for WebRTC signaling instead of a database table. This means:
 
-**You MUST run this SQL script in your Supabase project:**
+✅ **No SQL scripts required** - Signaling works out of the box
+✅ **Real-time communication** - Signals are broadcast instantly between peers
+✅ **Simpler architecture** - No database writes for ephemeral signaling data
 
-1. Go to your Supabase project dashboard
-2. Navigate to the SQL Editor
-3. Run the script: `scripts/004_create_signaling_table.sql`
-4. Also run: `scripts/005_enable_realtime.sql` to enable realtime on the signaling table
+## How It Works
 
-Without this table, peer connections will fail with "Failed to send connection signal" errors.
+1. When a peer needs to send a WebRTC signal (offer, answer, or ICE candidate), it broadcasts the signal through Supabase Realtime
+2. All peers in the room receive the broadcast
+3. Each peer checks if the signal is meant for them (by checking `toPeerId`)
+4. The target peer processes the signal and establishes the WebRTC connection
 
-## What the Signaling Table Does
+## Troubleshooting
 
-The signaling table temporarily stores WebRTC offers, answers, and ICE candidates that peers exchange to establish direct connections. Once connections are established, the signals are automatically cleaned up after 5 minutes.
+If peer connections are not establishing:
 
-## Verification
+1. **Check browser console** - Look for `[v0]` prefixed logs showing signal flow
+2. **Verify both peers are subscribed** - You should see "Signaling broadcast subscription status: SUBSCRIBED"
+3. **Check connection states** - Look for "Connection state changed" logs
+4. **Network issues** - Ensure both peers can reach STUN/TURN servers for NAT traversal
 
-After running the scripts, verify the table exists:
+## Connection Flow
 
-\`\`\`sql
-SELECT * FROM signaling LIMIT 1;
+\`\`\`
+User 1 (Initiator)          User 2 (Responder)
+      |                            |
+      |------ Broadcast Offer ---->|
+      |                            |
+      |<----- Broadcast Answer ----|
+      |                            |
+      |<-> Exchange ICE Candidates |
+      |                            |
+      |==== WebRTC Connected! =====|
 \`\`\`
 
-You should see the table structure without errors.
+## No Database Setup Required
+
+The previous implementation required running SQL scripts to create a signaling table. This is **no longer necessary**. Signaling now uses Supabase Realtime's broadcast feature, which requires no database setup.
+
+If you see errors about a missing "signaling" table, you can safely ignore them - the app no longer uses that table.

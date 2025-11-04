@@ -28,36 +28,33 @@ export default function Home() {
     async (toPeerId: string, signal: any) => {
       if (!user || !roomId) return
 
-      console.log("[v0] Sending signal to peer:", toPeerId, "Type:", signal.type)
+      console.log("[v0] Broadcasting signal to peer:", toPeerId, "Type:", signal.type)
 
       try {
-        const response = await fetch("/api/rooms/signal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            roomId,
-            targetPeerId: toPeerId,
+        // Use Supabase Realtime broadcast instead of database table
+        const channel = supabase.channel(`room:${roomId}`)
+
+        await channel.send({
+          type: "broadcast",
+          event: "webrtc-signal",
+          payload: {
+            fromPeerId: user.id,
+            toPeerId,
             signal,
-          }),
+          },
         })
 
-        if (!response.ok) {
-          const error = await response.json()
-          console.error("[v0] Signal API error:", error)
-          throw new Error(error.error || "Failed to send signal")
-        }
-
-        console.log("[v0] Signal sent successfully")
+        console.log("[v0] Signal broadcast successfully")
       } catch (error) {
-        console.error("[v0] Failed to send signal:", error)
+        console.error("[v0] Failed to broadcast signal:", error)
         toast({
           title: "Signaling error",
-          description: "Failed to send connection signal. Make sure the signaling table exists.",
+          description: "Failed to send connection signal",
           variant: "destructive",
         })
       }
     },
-    [user, roomId, toast],
+    [user, roomId, toast, supabase],
   )
 
   useEffect(() => {
@@ -74,52 +71,45 @@ export default function Home() {
   useEffect(() => {
     if (!connected || !user || !roomId) return
 
-    console.log("[v0] Setting up signaling subscription for user:", user.id)
+    console.log("[v0] Setting up broadcast signaling for user:", user.id)
 
     const signalingChannel = supabase
-      .channel(`signaling:${roomId}:${user.id}`, {
+      .channel(`room:${roomId}`, {
         config: {
           broadcast: { self: false },
-          presence: { key: "" },
         },
       })
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "signaling",
-          filter: `to_peer_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          console.log("[v0] Received signal:", payload.new.signal_data.type, "from:", payload.new.from_peer_id)
-          const signal = payload.new.signal_data
-          const fromPeerId = payload.new.from_peer_id
-          const connection = peerConnections.get(fromPeerId)
+      .on("broadcast", { event: "webrtc-signal" }, async (payload) => {
+        const { fromPeerId, toPeerId, signal } = payload.payload
 
-          if (!connection) {
-            console.error("[v0] No connection found for peer:", fromPeerId)
-            return
-          }
+        // Only process signals meant for this peer
+        if (toPeerId !== user.id) return
 
-          try {
-            if (signal.type === "offer") {
-              console.log("[v0] Handling offer from:", fromPeerId)
-              await connection.handleOffer(signal.offer)
-            } else if (signal.type === "answer") {
-              console.log("[v0] Handling answer from:", fromPeerId)
-              await connection.handleAnswer(signal.answer)
-            } else if (signal.type === "ice-candidate") {
-              console.log("[v0] Handling ICE candidate from:", fromPeerId)
-              await connection.handleIceCandidate(signal.candidate)
-            }
-          } catch (error) {
-            console.error("[v0] Error handling signal:", error)
+        console.log("[v0] Received broadcast signal:", signal.type, "from:", fromPeerId)
+        const connection = peerConnections.get(fromPeerId)
+
+        if (!connection) {
+          console.error("[v0] No connection found for peer:", fromPeerId)
+          return
+        }
+
+        try {
+          if (signal.type === "offer") {
+            console.log("[v0] Handling offer from:", fromPeerId)
+            await connection.handleOffer(signal.offer)
+          } else if (signal.type === "answer") {
+            console.log("[v0] Handling answer from:", fromPeerId)
+            await connection.handleAnswer(signal.answer)
+          } else if (signal.type === "ice-candidate") {
+            console.log("[v0] Handling ICE candidate from:", fromPeerId)
+            await connection.handleIceCandidate(signal.candidate)
           }
-        },
-      )
+        } catch (error) {
+          console.error("[v0] Error handling signal:", error)
+        }
+      })
       .subscribe((status) => {
-        console.log("[v0] Signaling subscription status:", status)
+        console.log("[v0] Signaling broadcast subscription status:", status)
       })
 
     return () => {
