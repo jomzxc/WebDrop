@@ -24,6 +24,38 @@ export default function Home() {
   const { peers, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(connected ? roomId : null)
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
+  const sendSignal = useCallback(
+    async (toPeerId: string, signal: any) => {
+      if (!user || !roomId) return
+
+      console.log("[v0] Sending signal to peer:", toPeerId, "Type:", signal.type)
+
+      try {
+        const { error } = await supabase.from("signaling").insert({
+          room_id: roomId,
+          from_peer_id: user.id,
+          to_peer_id: toPeerId,
+          signal_data: signal,
+        })
+
+        if (error) {
+          console.error("[v0] Error sending signal:", error)
+          throw error
+        }
+
+        console.log("[v0] Signal sent successfully")
+      } catch (error) {
+        console.error("[v0] Failed to send signal:", error)
+        toast({
+          title: "Signaling error",
+          description: "Failed to send connection signal",
+          variant: "destructive",
+        })
+      }
+    },
+    [user, roomId, supabase, toast],
+  )
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user }, error }) => {
       if (error || !user) {
@@ -56,7 +88,7 @@ export default function Home() {
           filter: `to_peer_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("[v0] Received signal:", payload)
+          console.log("[v0] Received signal:", payload.new.signal_data.type, "from:", payload.new.from_peer_id)
           const signal = payload.new.signal_data
           const fromPeerId = payload.new.from_peer_id
           const connection = peerConnections.get(fromPeerId)
@@ -68,10 +100,13 @@ export default function Home() {
 
           try {
             if (signal.type === "offer") {
+              console.log("[v0] Handling offer from:", fromPeerId)
               await connection.handleOffer(signal.offer)
             } else if (signal.type === "answer") {
+              console.log("[v0] Handling answer from:", fromPeerId)
               await connection.handleAnswer(signal.answer)
             } else if (signal.type === "ice-candidate") {
+              console.log("[v0] Handling ICE candidate from:", fromPeerId)
               await connection.handleIceCandidate(signal.candidate)
             }
           } catch (error) {
@@ -97,7 +132,11 @@ export default function Home() {
 
     currentPeers.forEach((peer) => {
       if (!newConnections.has(peer.user_id)) {
-        const pc = new PeerConnection(peer.user_id, user.id < peer.user_id, (signal) => {})
+        console.log("[v0] Creating connection to peer:", peer.username, "Initiator:", user.id < peer.user_id)
+
+        const pc = new PeerConnection(peer.user_id, user.id < peer.user_id, (signal) => {
+          sendSignal(peer.user_id, signal)
+        })
 
         pc.onData((data) => {
           if (!data || !data.type) return
@@ -111,7 +150,12 @@ export default function Home() {
           }
         })
 
+        pc.onStateChange((state) => {
+          console.log("[v0] Connection state changed:", peer.username, "->", state)
+        })
+
         pc.onError((error) => {
+          console.error("[v0] Connection error with", peer.username, ":", error)
           toast({
             title: "Connection error",
             description: `Failed to connect to ${peer.username}`,
@@ -120,7 +164,9 @@ export default function Home() {
         })
 
         if (user.id < peer.user_id) {
+          console.log("[v0] Creating offer for peer:", peer.username)
           pc.createOffer().catch((error) => {
+            console.error("[v0] Failed to create offer:", error)
             toast({
               title: "Connection failed",
               description: "Could not establish peer connection",
@@ -135,6 +181,7 @@ export default function Home() {
 
     Array.from(newConnections.keys()).forEach((peerId) => {
       if (!peers.find((p) => p.user_id === peerId)) {
+        console.log("[v0] Closing connection to peer:", peerId)
         newConnections.get(peerId)?.close()
         newConnections.delete(peerId)
       }
@@ -145,7 +192,7 @@ export default function Home() {
     return () => {
       newConnections.forEach((conn) => conn.close())
     }
-  }, [peers, connected, user, handleFileMetadata, handleFileChunk, handleFileComplete, toast])
+  }, [peers, connected, user, handleFileMetadata, handleFileChunk, handleFileComplete, toast, sendSignal])
 
   const handleJoinRoom = async (id: string) => {
     try {
