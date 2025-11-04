@@ -136,7 +136,6 @@ export default function Home() {
     const channel = supabase.channel(`room:${roomId}:signaling`, {
       config: {
         broadcast: { self: false, ack: false },
-        // We link this channel's presence to the one in useRoom
         presence: { key: user.id },
       },
     })
@@ -344,8 +343,7 @@ export default function Home() {
     previousPeerIdsRef.current = new Set()
     pendingSignalsRef.current.clear()
     setIsChannelReady(false)
-    
-    // Manually untrack from presence before calling leaveRoom
+
     const channel = signalingChannelRef.current
     if (channel) {
       await channel.untrack()
@@ -404,7 +402,9 @@ export default function Home() {
     })
   }, [router, supabase])
 
-  const isReadyToTransfer = Array.from(peerConnectionStates.values()).some((state) => state === "connected")
+  const isReadyToTransfer = Array.from(peerConnectionStates.entries()).some(([peerId, state]) => {
+    return onlineUserIds.has(peerId) && state === "connected"
+  })
 
   if (isAuthLoading) {
     return (
@@ -458,7 +458,6 @@ export default function Home() {
                       onRefresh={refreshPeersRef.current}
                       currentUserId={user.id}
                       connectionStates={peerConnectionStates}
-                      // --- Pass the live list of online users ---
                       onlineUserIds={onlineUserIds}
                     />
                   </>
