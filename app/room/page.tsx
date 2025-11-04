@@ -35,7 +35,8 @@ export default function RoomPage() {
   const { peers, onlineUserIds, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(
     connected ? roomId : null,
   )
-  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
+  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete, clearTransfers } =
+    useFileTransfer(roomId)
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
@@ -344,6 +345,8 @@ export default function RoomPage() {
     previousPeerIdsRef.current = new Set()
     pendingSignalsRef.current.clear()
     setIsChannelReady(false)
+
+    clearTransfers()
 
     const channel = signalingChannelRef.current
     if (channel) {
