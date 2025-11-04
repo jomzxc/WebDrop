@@ -24,6 +24,9 @@ export default function Home() {
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map())
   const previousPeerIdsRef = useRef<Set<string>>(new Set())
   const pendingSignalsRef = useRef<Map<string, any[]>>(new Map())
+  const peersRef = useRef<any[]>([])
+  const refreshPeersRef = useRef<() => Promise<void>>()
+  const createPeerConnectionRef = useRef<(peerId: string, username: string, isInitiator: boolean) => PeerConnection>()
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -31,10 +34,6 @@ export default function Home() {
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
-
-  useEffect(() => {
-    peerConnectionsRef.current = peerConnections
-  }, [peerConnections])
 
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
@@ -83,6 +82,22 @@ export default function Home() {
     [handleFileMetadata, handleFileChunk, handleFileComplete, toast],
   )
 
+  useEffect(() => {
+    peersRef.current = peers
+  }, [peers])
+
+  useEffect(() => {
+    refreshPeersRef.current = refreshPeers
+  }, [refreshPeers])
+
+  useEffect(() => {
+    createPeerConnectionRef.current = createPeerConnection
+  }, [createPeerConnection])
+
+  useEffect(() => {
+    peerConnectionsRef.current = peerConnections
+  }, [peerConnections])
+
   sendSignalRef.current = async (toPeerId: string, signal: any) => {
     if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
       console.log("[v0] ❌ Cannot send signal - channel not ready:", {
@@ -127,18 +142,6 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      if (error || !user) {
-        router.push("/auth/login")
-      } else {
-        setUser(user)
-        console.log("[v0] 👤 User authenticated:", user.id.substring(0, 8))
-      }
-      setIsAuthLoading(false)
-    })
-  }, [router, supabase])
-
-  useEffect(() => {
     if (!connected || !user || !roomId) {
       setIsChannelReady(false)
       return
@@ -172,14 +175,16 @@ export default function Home() {
       if (!connection) {
         console.log("[v0] 🔧 No connection found, checking if peer exists in list")
 
-        await refreshPeers()
+        if (refreshPeersRef.current) {
+          await refreshPeersRef.current()
+        }
 
-        const peer = peers.find((p) => p.user_id === fromPeerId)
+        const peer = peersRef.current.find((p) => p.user_id === fromPeerId)
 
-        if (peer) {
+        if (peer && createPeerConnectionRef.current) {
           console.log("[v0] ✨ Creating connection for new peer:", peer.username)
           const isInitiator = user.id < fromPeerId
-          const newConnection = createPeerConnection(fromPeerId, peer.username, isInitiator)
+          const newConnection = createPeerConnectionRef.current(fromPeerId, peer.username, isInitiator)
 
           const newConnections = new Map(peerConnectionsRef.current)
           newConnections.set(fromPeerId, newConnection)
@@ -234,7 +239,7 @@ export default function Home() {
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
     }
-  }, [connected, user, roomId, peers, refreshPeers, createPeerConnection])
+  }, [connected, user, roomId])
 
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
@@ -242,7 +247,7 @@ export default function Home() {
       return
     }
 
-    const currentPeerIds = new Set(peers.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
+    const currentPeerIds = new Set(peersRef.current.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
     const previousPeerIds = previousPeerIdsRef.current
 
     const peersChanged =
@@ -256,7 +261,7 @@ export default function Home() {
     previousPeerIdsRef.current = currentPeerIds
 
     const timer = setTimeout(() => {
-      const currentPeers = peers.filter((p) => p.user_id !== user.id)
+      const currentPeers = peersRef.current.filter((p) => p.user_id !== user.id)
       const newConnections = new Map(peerConnections)
 
       console.log(
@@ -270,42 +275,44 @@ export default function Home() {
       currentPeers.forEach((peer) => {
         if (!newConnections.has(peer.user_id)) {
           const isInitiator = user.id < peer.user_id
-          const pc = createPeerConnection(peer.user_id, peer.username, isInitiator)
-          newConnections.set(peer.user_id, pc)
+          const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
+          if (pc) {
+            newConnections.set(peer.user_id, pc)
 
-          const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
-          if (bufferedSignals && bufferedSignals.length > 0) {
-            console.log("[v0] 📦 Processing", bufferedSignals.length, "buffered signals for peer:", peer.username)
-            bufferedSignals.forEach(async (signal) => {
-              try {
-                if (signal.type === "offer") {
-                  await pc.handleOffer(signal.offer)
-                } else if (signal.type === "answer") {
-                  await pc.handleAnswer(signal.answer)
-                } else if (signal.type === "ice-candidate") {
-                  await pc.handleIceCandidate(signal.candidate)
+            const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
+            if (bufferedSignals && bufferedSignals.length > 0) {
+              console.log("[v0] 📦 Processing", bufferedSignals.length, "buffered signals for peer:", peer.username)
+              bufferedSignals.forEach(async (signal) => {
+                try {
+                  if (signal.type === "offer") {
+                    await pc.handleOffer(signal.offer)
+                  } else if (signal.type === "answer") {
+                    await pc.handleAnswer(signal.answer)
+                  } else if (signal.type === "ice-candidate") {
+                    await pc.handleIceCandidate(signal.candidate)
+                  }
+                } catch (error) {
+                  console.error("[v0] ❌ Error processing buffered signal:", error)
                 }
-              } catch (error) {
-                console.error("[v0] ❌ Error processing buffered signal:", error)
-              }
-            })
-            pendingSignalsRef.current.delete(peer.user_id)
-          }
-
-          if (isInitiator) {
-            console.log("[v0] 🚀 Creating offer for peer:", peer.username)
-            setTimeout(() => {
-              pc.createOffer().catch((error) => {
-                console.error("[v0] ❌ Failed to create offer:", error)
-                toast({
-                  title: "Connection failed",
-                  description: "Could not establish peer connection",
-                  variant: "destructive",
-                })
               })
-            }, 500)
-          } else {
-            console.log("[v0] ⏳ Waiting for offer from peer:", peer.username)
+              pendingSignalsRef.current.delete(peer.user_id)
+            }
+
+            if (isInitiator) {
+              console.log("[v0] 🚀 Creating offer for peer:", peer.username)
+              setTimeout(() => {
+                pc.createOffer().catch((error) => {
+                  console.error("[v0] ❌ Failed to create offer:", error)
+                  toast({
+                    title: "Connection failed",
+                    description: "Could not establish peer connection",
+                    variant: "destructive",
+                  })
+                })
+              }, 500)
+            } else {
+              console.log("[v0] ⏳ Waiting for offer from peer:", peer.username)
+            }
           }
         }
       })
@@ -325,7 +332,7 @@ export default function Home() {
     return () => {
       clearTimeout(timer)
     }
-  }, [peers, connected, user, isChannelReady, peerConnections, toast, createPeerConnection])
+  }, [connected, user, isChannelReady, peerConnections, toast])
 
   useEffect(() => {
     return () => {
@@ -373,7 +380,7 @@ export default function Home() {
 
   const handleFileSelect = useCallback(
     (files: FileList, peerId: string) => {
-      const peer = peers.find((p) => p.user_id === peerId)
+      const peer = peersRef.current.find((p) => p.user_id === peerId)
       const connection = peerConnections.get(peerId)
 
       console.log("[v0] 📁 File select:", {
@@ -411,8 +418,20 @@ export default function Home() {
         })
       })
     },
-    [peers, peerConnections, sendFile, toast],
+    [toast],
   )
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error || !user) {
+        router.push("/auth/login")
+      } else {
+        setUser(user)
+        console.log("[v0] 👤 User authenticated:", user.id.substring(0, 8))
+      }
+      setIsAuthLoading(false)
+    })
+  }, [router, supabase])
 
   if (isAuthLoading) {
     return (
@@ -456,10 +475,10 @@ export default function Home() {
                     <FileTransferPanel
                       roomId={roomId}
                       transfers={transfers}
-                      peers={peers}
+                      peers={peersRef.current}
                       onFileSelect={handleFileSelect}
                     />
-                    <PeerList peers={peers} onRefresh={refreshPeers} />
+                    <PeerList peers={peersRef.current} onRefresh={refreshPeersRef.current} />
                   </>
                 ) : (
                   <div className="h-64 flex items-center justify-center">
