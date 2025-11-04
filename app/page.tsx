@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import RoomManager from "@/components/room-manager"
@@ -11,6 +11,7 @@ import { useRoom } from "@/lib/hooks/use-room"
 import { useFileTransfer } from "@/lib/hooks/use-file-transfer"
 import { PeerConnection } from "@/lib/webrtc/peer-connection"
 import { useToast } from "@/hooks/use-toast"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 
 export default function Home() {
   const [roomId, setRoomId] = useState<string>("")
@@ -18,6 +19,8 @@ export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [peerConnections, setPeerConnections] = useState<Map<string, PeerConnection>>(new Map())
   const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const signalingChannelRef = useRef<RealtimeChannel | null>(null)
+  const [isChannelReady, setIsChannelReady] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -26,15 +29,15 @@ export default function Home() {
 
   const sendSignal = useCallback(
     async (toPeerId: string, signal: any) => {
-      if (!user || !roomId) return
+      if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
+        console.log("[v0] Cannot send signal - channel not ready")
+        return
+      }
 
       console.log("[v0] Broadcasting signal to peer:", toPeerId, "Type:", signal.type)
 
       try {
-        // Use Supabase Realtime broadcast instead of database table
-        const channel = supabase.channel(`room:${roomId}`)
-
-        await channel.send({
+        await signalingChannelRef.current.send({
           type: "broadcast",
           event: "webrtc-signal",
           payload: {
@@ -54,7 +57,7 @@ export default function Home() {
         })
       }
     },
-    [user, roomId, toast, supabase],
+    [user, roomId, isChannelReady, toast],
   )
 
   useEffect(() => {
@@ -69,23 +72,26 @@ export default function Home() {
   }, [router, supabase])
 
   useEffect(() => {
-    if (!connected || !user || !roomId) return
+    if (!connected || !user || !roomId) {
+      setIsChannelReady(false)
+      return
+    }
 
-    console.log("[v0] Setting up broadcast signaling for user:", user.id)
+    console.log("[v0] Setting up signaling channel for room:", roomId)
 
-    const signalingChannel = supabase
-      .channel(`room:${roomId}`, {
-        config: {
-          broadcast: { self: false },
-        },
-      })
+    const channel = supabase.channel(`room:${roomId}`, {
+      config: {
+        broadcast: { self: false, ack: true },
+      },
+    })
+
+    channel
       .on("broadcast", { event: "webrtc-signal" }, async (payload) => {
         const { fromPeerId, toPeerId, signal } = payload.payload
 
-        // Only process signals meant for this peer
         if (toPeerId !== user.id) return
 
-        console.log("[v0] Received broadcast signal:", signal.type, "from:", fromPeerId)
+        console.log("[v0] Received signal:", signal.type, "from:", fromPeerId)
         const connection = peerConnections.get(fromPeerId)
 
         if (!connection) {
@@ -109,17 +115,31 @@ export default function Home() {
         }
       })
       .subscribe((status) => {
-        console.log("[v0] Signaling broadcast subscription status:", status)
+        console.log("[v0] Signaling channel status:", status)
+        if (status === "SUBSCRIBED") {
+          signalingChannelRef.current = channel
+          setIsChannelReady(true)
+          console.log("[v0] Signaling channel ready")
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setIsChannelReady(false)
+          toast({
+            title: "Connection error",
+            description: "Failed to establish signaling channel",
+            variant: "destructive",
+          })
+        }
       })
 
     return () => {
-      console.log("[v0] Cleaning up signaling subscription")
-      supabase.removeChannel(signalingChannel)
+      console.log("[v0] Cleaning up signaling channel")
+      setIsChannelReady(false)
+      signalingChannelRef.current = null
+      supabase.removeChannel(channel)
     }
-  }, [connected, user, roomId, peerConnections, supabase])
+  }, [connected, user, roomId, peerConnections, supabase, toast])
 
   useEffect(() => {
-    if (!connected || !user) return
+    if (!connected || !user || !isChannelReady) return
 
     const currentPeers = peers.filter((p) => p.user_id !== user.id)
     const newConnections = new Map(peerConnections)
@@ -186,7 +206,17 @@ export default function Home() {
     return () => {
       newConnections.forEach((conn) => conn.close())
     }
-  }, [peers, connected, user, handleFileMetadata, handleFileChunk, handleFileComplete, toast, sendSignal])
+  }, [
+    peers,
+    connected,
+    user,
+    isChannelReady,
+    handleFileMetadata,
+    handleFileChunk,
+    handleFileComplete,
+    toast,
+    sendSignal,
+  ])
 
   const handleJoinRoom = async (id: string) => {
     try {
@@ -207,6 +237,8 @@ export default function Home() {
   const handleLeaveRoom = async () => {
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
+    setIsChannelReady(false)
+    signalingChannelRef.current = null
     await leaveRoom(roomId)
     setRoomId("")
     setConnected(false)
