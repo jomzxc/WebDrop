@@ -4,6 +4,7 @@ export class PeerConnection {
   private onDataCallback: ((data: any) => void) | null = null
   private onStateChangeCallback: ((state: string) => void) | null = null
   private onErrorCallback: ((error: Error) => void) | null = null
+  private iceCandidateBuffer: RTCIceCandidateInit[] = []
 
   constructor(
     private peerId: string,
@@ -103,6 +104,7 @@ export class PeerConnection {
   async handleOffer(offer: RTCSessionDescriptionInit) {
     try {
       await this.pc.setRemoteDescription(offer)
+      await this.processPendingIceCandidates()
       const answer = await this.pc.createAnswer()
       await this.pc.setLocalDescription(answer)
       this.onSignal({
@@ -119,6 +121,7 @@ export class PeerConnection {
   async handleAnswer(answer: RTCSessionDescriptionInit) {
     try {
       await this.pc.setRemoteDescription(answer)
+      await this.processPendingIceCandidates()
     } catch (error) {
       this.onErrorCallback?.(new Error("Failed to handle answer"))
       throw error
@@ -127,11 +130,34 @@ export class PeerConnection {
 
   async handleIceCandidate(candidate: RTCIceCandidateInit) {
     try {
+      // Check if remote description is set
+      if (!this.pc.remoteDescription) {
+        // Buffer the candidate for later
+        this.iceCandidateBuffer.push(candidate)
+        return
+      }
+
+      // Remote description is set, add candidate immediately
       await this.pc.addIceCandidate(candidate)
     } catch (error) {
       this.onErrorCallback?.(new Error("Failed to add ICE candidate"))
       throw error
     }
+  }
+
+  private async processPendingIceCandidates() {
+    if (this.iceCandidateBuffer.length === 0) return
+
+    for (const candidate of this.iceCandidateBuffer) {
+      try {
+        await this.pc.addIceCandidate(candidate)
+      } catch (error) {
+        console.error("[v0] Failed to add buffered ICE candidate:", error)
+      }
+    }
+
+    // Clear the buffer
+    this.iceCandidateBuffer = []
   }
 
   sendData(data: any) {
