@@ -46,25 +46,47 @@ export async function POST(request: Request) {
     // Get user profile
     const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single()
 
-    // Add user as peer (upsert to handle rejoining)
-    const { error: peerError } = await supabase.from("peers").upsert(
-      {
+    const { data: existingPeer } = await supabase
+      .from("peers")
+      .select("*")
+      .eq("room_id", sanitizedRoomId)
+      .eq("user_id", user.id)
+      .single()
+
+    if (existingPeer) {
+      const { error: updateError } = await supabase
+        .from("peers")
+        .update({ last_seen: new Date().toISOString() })
+        .eq("id", existingPeer.id)
+
+      if (updateError) {
+        console.error("Failed to update peer:", updateError)
+      }
+
+      return NextResponse.json({ room, peer: existingPeer })
+    }
+
+    const { data: newPeer, error: peerError } = await supabase
+      .from("peers")
+      .insert({
         room_id: sanitizedRoomId,
         user_id: user.id,
         username: profile?.username || user.email?.split("@")[0] || "Anonymous",
         last_seen: new Date().toISOString(),
-      },
-      {
-        onConflict: "room_id,user_id",
-      },
-    )
+      })
+      .select()
+      .single()
 
     if (peerError) {
+      console.error("Failed to create peer:", peerError)
       return NextResponse.json({ error: "Failed to join room" }, { status: 500 })
     }
 
-    return NextResponse.json({ room })
+    console.log("[v0] Peer joined room:", newPeer)
+
+    return NextResponse.json({ room, peer: newPeer })
   } catch (error) {
+    console.error("Join room error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

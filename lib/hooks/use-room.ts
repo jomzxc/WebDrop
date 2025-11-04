@@ -26,11 +26,11 @@ export function useRoom(roomId: string | null) {
       if (error) throw error
 
       if (data) {
-        console.log("[v0] Fetched peers:", data) // Added debug logging
+        console.log("[v0] Fetched peers:", data.length, "peers")
         setPeers(data)
       }
     } catch (error) {
-      console.error("[v0] Error fetching peers:", error) // Added debug logging
+      console.error("[v0] Error fetching peers:", error)
       toast({
         title: "Failed to fetch peers",
         description: "Could not load room participants",
@@ -40,37 +40,78 @@ export function useRoom(roomId: string | null) {
   }, [roomId, supabase, toast])
 
   useEffect(() => {
-    if (!roomId) return
+    if (!roomId) {
+      setPeers([])
+      return
+    }
 
-    console.log("[v0] Setting up room subscription for:", roomId) // Added debug logging
+    console.log("[v0] Setting up room subscription for:", roomId)
+
     fetchPeers()
 
     const channel = supabase
-      .channel(`room:${roomId}:peers`, {
+      .channel(`room:${roomId}`, {
         config: {
-          broadcast: { self: false },
+          broadcast: { self: true }, // Changed to true to receive own changes
           presence: { key: "" },
         },
       })
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "peers",
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log("[v0] Peer change detected:", payload) // Added debug logging
-          fetchPeers()
+          console.log("[v0] Peer INSERT detected:", payload.new)
+          setPeers((current) => {
+            const exists = current.some((p) => p.id === payload.new.id)
+            if (exists) return current
+            return [...current, payload.new as Peer]
+          })
         },
       )
-      .subscribe((status) => {
-        console.log("[v0] Subscription status:", status) // Added debug logging
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "peers",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          console.log("[v0] Peer UPDATE detected:", payload.new)
+          setPeers((current) => current.map((p) => (p.id === payload.new.id ? (payload.new as Peer) : p)))
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "peers",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          console.log("[v0] Peer DELETE detected:", payload.old)
+          setPeers((current) => current.filter((p) => p.id !== payload.old.id))
+        },
+      )
+      .subscribe((status, err) => {
+        console.log("[v0] Subscription status:", status)
+        if (err) {
+          console.error("[v0] Subscription error:", err)
+        }
+        if (status === "SUBSCRIBED") {
+          console.log("[v0] Subscription active, refetching peers")
+          fetchPeers()
+        }
       })
 
     return () => {
-      console.log("[v0] Cleaning up room subscription") // Added debug logging
+      console.log("[v0] Cleaning up room subscription")
       supabase.removeChannel(channel)
     }
   }, [roomId, fetchPeers, supabase])
