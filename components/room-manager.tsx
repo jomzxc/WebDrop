@@ -18,8 +18,7 @@ export default function RoomManager({ onJoinRoom, onLeaveRoom, connected, roomId
   const [copied, setCopied] = useState(false)
 
   const handleCreateRoom = () => {
-    const newRoomId = Math.random().toString(36).substring(2, 9).toUpperCase()
-    onJoinRoom(newRoomId)
+    onJoinRoom("create")
   }
 
   const handleJoinRoom = () => {

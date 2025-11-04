@@ -4,23 +4,23 @@ import type React from "react"
 
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
-import { Upload, File, CheckCircle2, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Upload, CheckCircle2, AlertCircle, Download, Send, X } from "lucide-react"
+import type { Transfer } from "@/lib/hooks/use-file-transfer"
+import type { Peer } from "@/lib/types/database"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface FileTransferPanelProps {
   roomId: string
+  transfers: Transfer[]
+  peers: Peer[]
+  onFileSelect: (files: FileList, peerId: string) => void
 }
 
-interface TransferItem {
-  id: string
-  fileName: string
-  progress: number
-  size: string
-  status: "uploading" | "completed" | "failed"
-}
-
-export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
-  const [transfers, setTransfers] = useState<TransferItem[]>([])
+export default function FileTransferPanel({ roomId, transfers, peers, onFileSelect }: FileTransferPanelProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [selectedPeer, setSelectedPeer] = useState<string>("")
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -31,38 +31,10 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
     setIsDragging(false)
   }
 
-  const simulateFileUpload = (fileName: string, fileSize: string) => {
-    const id = Math.random().toString(36).substring(7)
-    const newTransfer: TransferItem = {
-      id,
-      fileName,
-      progress: 0,
-      size: fileSize,
-      status: "uploading",
-    }
-
-    setTransfers((prev) => [...prev, newTransfer])
-
-    let currentProgress = 0
-    const interval = setInterval(() => {
-      currentProgress += Math.random() * 30
-      if (currentProgress >= 100) {
-        currentProgress = 100
-        clearInterval(interval)
-        setTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, progress: 100, status: "completed" } : t)))
-      } else {
-        setTransfers((prev) => prev.map((t) => (t.id === id ? { ...t, progress: currentProgress } : t)))
-      }
-    }, 300)
-  }
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
-    if (files) {
-      Array.from(files).forEach((file) => {
-        const sizeInMB = (file.size / (1024 * 1024)).toFixed(2)
-        simulateFileUpload(file.name, `${sizeInMB} MB`)
-      })
+    if (files && files.length > 0) {
+      setPendingFiles(files)
     }
   }
 
@@ -71,13 +43,27 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
     setIsDragging(false)
 
     const files = e.dataTransfer.files
-    if (files) {
-      Array.from(files).forEach((file) => {
-        const sizeInMB = (file.size / (1024 * 1024)).toFixed(2)
-        simulateFileUpload(file.name, `${sizeInMB} MB`)
-      })
+    if (files && files.length > 0) {
+      setPendingFiles(files)
     }
   }
+
+  const handleSendFiles = () => {
+    if (pendingFiles && selectedPeer) {
+      onFileSelect(pendingFiles, selectedPeer)
+      setPendingFiles(null)
+      setSelectedPeer("")
+    }
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
+
+  // Filter out current user from peer list
+  const availablePeers = peers.filter((p) => p.user_id !== peers[0]?.user_id)
 
   return (
     <Card className="p-8 space-y-6 backdrop-blur-xl border border-border/50 bg-card/40 shadow-2xl rounded-2xl overflow-hidden">
@@ -86,9 +72,10 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
       <div className="relative space-y-6">
         <div>
           <h3 className="text-2xl font-bold text-foreground mb-2">File Transfer</h3>
-          <p className="text-sm text-muted-foreground">Upload files to share with peers in this room</p>
+          <p className="text-sm text-muted-foreground">Share files directly with peers in this room</p>
         </div>
 
+        {/* File Selection Area */}
         <label
           className={`block border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${
             isDragging
@@ -113,12 +100,57 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
           </div>
         </label>
 
+        {/* Pending Files - Select Recipient */}
+        {pendingFiles && pendingFiles.length > 0 && (
+          <div className="p-4 bg-accent/10 border border-accent/30 rounded-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-foreground">
+                  {pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""} selected
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Choose a recipient to send</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPendingFiles(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="flex gap-3">
+              <Select value={selectedPeer} onValueChange={setSelectedPeer}>
+                <SelectTrigger className="flex-1 bg-background/50">
+                  <SelectValue placeholder="Select recipient" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availablePeers.map((peer) => (
+                    <SelectItem key={peer.id} value={peer.user_id}>
+                      {peer.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleSendFiles}
+                disabled={!selectedPeer}
+                className="bg-gradient-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Send
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Transfer List */}
         {transfers.length > 0 && (
           <div className="space-y-4">
             <h4 className="font-semibold text-foreground flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-accent animate-pulse" />
-              Active Transfers ({transfers.length})
+              Transfers ({transfers.length})
             </h4>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {transfers.map((transfer) => (
@@ -128,10 +160,20 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <File className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                      {transfer.direction === "sending" ? (
+                        <Upload className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <Download className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">{transfer.fileName}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{transfer.size}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground">{formatFileSize(transfer.fileSize)}</p>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
+                            {transfer.direction === "sending" ? "To" : "From"} {transfer.peerName}
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -150,7 +192,9 @@ export default function FileTransferPanel({ roomId }: FileTransferPanelProps) {
                           ? "bg-gradient-to-r from-green-500 to-green-400"
                           : transfer.status === "failed"
                             ? "bg-gradient-to-r from-red-500 to-red-400"
-                            : "bg-gradient-to-r from-accent to-primary"
+                            : transfer.direction === "sending"
+                              ? "bg-gradient-to-r from-accent to-primary"
+                              : "bg-gradient-to-r from-primary to-accent"
                       }`}
                       style={{ width: `${transfer.progress}%` }}
                     />
