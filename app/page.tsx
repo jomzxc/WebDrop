@@ -36,14 +36,14 @@ export default function Home() {
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
-  // This runs once when the component mounts
+  // --- LOAD ROOM FROM SESSIONSTORAGE ON PAGE LOAD ---
   useEffect(() => {
     const storedRoomId = sessionStorage.getItem("webdrop-roomId")
     if (storedRoomId) {
       setRoomId(storedRoomId)
       setConnected(true)
     }
-  }, []) // Empty dependency array ensures this runs only once on mount
+  }, [])
 
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
@@ -105,8 +105,6 @@ export default function Home() {
     createPeerConnectionRef.current = createPeerConnection
   }, [createPeerConnection])
 
-  // This effect ensures peerConnectionsRef.current is always up-to-date
-  // when the peerConnections state changes.
   useEffect(() => {
     peerConnectionsRef.current = peerConnections
   }, [peerConnections])
@@ -168,6 +166,46 @@ export default function Home() {
       },
     })
 
+    channel.on("broadcast", { event: "webrtc-hello" }, (payload) => {
+      const { fromPeerId } = payload.payload
+      if (!fromPeerId || fromPeerId === user.id) return
+
+      console.log(`[v0] 🤝 Received hello from ${fromPeerId.substring(0, 8)}`)
+
+      const existingConnection = peerConnectionsRef.current.get(fromPeerId)
+      if (existingConnection) {
+        console.log(`[v0] 🧹 Closing stale connection to ${fromPeerId.substring(0, 8)}`)
+        existingConnection.close()
+      }
+
+      const peer = peersRef.current.find((p) => p.user_id === fromPeerId)
+      if (!peer) {
+        console.warn(`[v0] ❓ Got hello from peer not in list: ${fromPeerId.substring(0, 8)}. Waiting for list update.`)
+        return
+      }
+
+      const isInitiator = user.id < fromPeerId
+      const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
+      if (!pc) return
+
+      const newConnections = new Map(peerConnectionsRef.current)
+      newConnections.set(fromPeerId, pc)
+      setPeerConnections(newConnections)
+
+      const newStates = new Map(peerConnectionStates)
+      newStates.set(fromPeerId, "new")
+      setPeerConnectionStates(newStates)
+
+      if (isInitiator) {
+        console.log(`[v0] 🚀 Re-creating offer for peer: ${peer.username}`)
+        pc.createOffer().catch((error) => {
+          console.error("[v0] ❌ Failed to create offer:", error)
+        })
+      } else {
+        console.log(`[v0] ⏳ Waiting for re-offer from peer: ${peer.username}`)
+      }
+    })
+
     channel.on("broadcast", { event: "webrtc-signal" }, async (payload) => {
       const { fromPeerId, toPeerId, signal } = payload.payload
 
@@ -185,8 +223,6 @@ export default function Home() {
 
       let connection = peerConnectionsRef.current.get(fromPeerId)
 
-      // If connection doesn't exist, just buffer the signal and return.
-      // The connection will be created by the useEffect hook below.
       if (!connection) {
         console.log("[v0] 📦 No connection found. Buffering signal from peer:", fromPeerId.substring(0, 8))
         const buffer = pendingSignalsRef.current.get(fromPeerId) || []
@@ -195,7 +231,6 @@ export default function Home() {
         return
       }
 
-      // If connection *does* exist, handle the signal.
       try {
         if (signal.type === "offer") {
           console.log("[v0] 📥 Handling offer from:", fromPeerId.substring(0, 8))
@@ -219,6 +254,14 @@ export default function Home() {
         console.log("[v0] ✅ Signaling channel SUBSCRIBED - setting ready")
         signalingChannelRef.current = channel
         setIsChannelReady(true)
+
+
+        console.log("[v0] 📣 Broadcasting hello to room")
+        channel.send({
+          type: "broadcast",
+          event: "webrtc-hello",
+          payload: { fromPeerId: user.id },
+        })
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         console.error("[v0] ❌ Signaling channel error:", status)
         setIsChannelReady(false)
@@ -236,21 +279,18 @@ export default function Home() {
     }
   }, [connected, user, roomId])
 
-  // This hook now correctly depends on `peers` state.
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
       console.log("[v0] ⏸️  Not ready for peer connections:", { connected, hasUser: !!user, isChannelReady })
       return
     }
 
-    // Use the `peers` state directly, which comes from useRoom
     const currentPeerIds = new Set(peers.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
     const previousPeerIds = previousPeerIdsRef.current
 
     const peersChanged =
       currentPeerIds.size !== previousPeerIds.size || Array.from(currentPeerIds).some((id) => !previousPeerIds.has(id))
 
-    // Only run the logic if the peer list has actually changed.
     if (!peersChanged) {
       return
     }
@@ -259,9 +299,7 @@ export default function Home() {
 
     const timer = setTimeout(() => {
       const currentPeers = peers.filter((p) => p.user_id !== user.id)
-      // Read from the ref to get the most current map
       const newConnections = new Map(peerConnectionsRef.current)
-      // --- Create a new map for the connection states ---
       const newStates = new Map(peerConnectionStates)
 
       console.log(
@@ -279,10 +317,8 @@ export default function Home() {
           const pc = createPeerConnectionRef.current?.(peer.user_id, peer.username, isInitiator)
           if (pc) {
             newConnections.set(peer.user_id, pc)
-            // --- Set initial state to 'new' ---
             newStates.set(peer.user_id, "new")
 
-            // Now, check for and process any buffered signals for this new peer
             const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
             if (bufferedSignals && bufferedSignals.length > 0) {
               console.log("[v0] 📦 Processing", bufferedSignals.length, "buffered signals for peer:", peer.username)
@@ -313,7 +349,7 @@ export default function Home() {
                     variant: "destructive",
                   })
                 })
-              }, 500) // Small delay to allow connection to be set
+              }, 500)
             } else {
               console.log("[v0] ⏳ Waiting for offer from peer:", peer.username)
             }
@@ -321,24 +357,20 @@ export default function Home() {
         }
       })
 
-      // Check for peers that have left
       Array.from(newConnections.keys()).forEach((peerId) => {
         if (!currentPeerIds.has(peerId)) {
           console.log("[v0] 🗑️  Peer left, closing connection:", peerId.substring(0, 8))
           newConnections.get(peerId)?.close()
           newConnections.delete(peerId)
-          // --- Remove peer from states map ---
           newStates.delete(peerId)
           pendingSignalsRef.current.delete(peerId)
         }
       })
 
-      // Update the state, which will trigger the ref update
       setPeerConnections(newConnections)
-      // --- Update the states map ---
       setPeerConnectionStates(newStates)
       previousPeerIdsRef.current = currentPeerIds
-    }, 1000) // 1s debounce to prevent churn
+    }, 1000)
 
     return () => {
       clearTimeout(timer)
@@ -347,7 +379,6 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
-      // Cleanup on unmount
       if (peerConnectionsRef.current.size > 0) {
         console.log("[v0] 🧹 Component unmounting, cleaning up all peer connections")
         peerConnectionsRef.current.forEach((conn) => conn.close())
@@ -382,7 +413,6 @@ export default function Home() {
     console.log("[v0] 👋 Leaving room")
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
-    // --- Clear connection states on leave ---
     setPeerConnectionStates(new Map())
     previousPeerIdsRef.current = new Set()
     pendingSignalsRef.current.clear()
@@ -398,7 +428,7 @@ export default function Home() {
   const handleFileSelect = useCallback(
     (files: FileList, peerId: string) => {
       const peer = peersRef.current.find((p) => p.user_id === peerId)
-      const connection = peerConnectionsRef.current.get(peerId) // Use the ref
+      const connection = peerConnectionsRef.current.get(peerId)
 
       console.log("[v0] 📁 File select:", {
         peer: peer?.username,
@@ -435,7 +465,7 @@ export default function Home() {
         })
       })
     },
-    [toast, sendFile], // sendFile is from useFileTransfer, safe dependency
+    [toast, sendFile],
   )
 
   useEffect(() => {
@@ -485,7 +515,6 @@ export default function Home() {
                   connected={connected}
                   roomId={roomId}
                   isLoading={isLoading}
-                  // --- Pass new prop ---
                   isReadyToTransfer={isReadyToTransfer}
                 />
               </div>
@@ -503,7 +532,6 @@ export default function Home() {
                     <PeerList
                       peers={peersRef.current}
                       onRefresh={refreshPeersRef.current}
-                      // --- Pass new props ---
                       currentUserId={user.id}
                       connectionStates={peerConnectionStates}
                     />
