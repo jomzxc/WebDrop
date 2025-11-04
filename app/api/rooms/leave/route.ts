@@ -21,23 +21,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid room ID" }, { status: 400 })
     }
 
-    // Remove user from peers
-    const { error: deleteError } = await supabase.from("peers").delete().eq("room_id", roomId).eq("user_id", user.id)
+    const { error: deleteError } = await supabase
+      .from("peers")
+      .delete()
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
 
     if (deleteError) {
       return NextResponse.json({ error: "Failed to leave room" }, { status: 500 })
     }
 
-    // Check if room is empty
-    const { data: peers, error: peersError } = await supabase.from("peers").select("id").eq("room_id", roomId)
+    const { error: roomDeleteError } = await supabase
+      .from("rooms")
+      .delete()
+      .eq("id", roomId)
 
-    if (peersError) {
-      return NextResponse.json({ success: true })
-    }
-
-    // If no peers left, deactivate room
-    if (!peers || peers.length === 0) {
-      await supabase.from("rooms").update({ is_active: false }).eq("id", roomId)
+    if (roomDeleteError) {
+      // This error is expected if the room is not empty
+      console.warn("Failed to delete room (likely not empty):", roomDeleteError.message)
     }
 
     return NextResponse.json({ success: true })
