@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Mail } from "lucide-react"
+import { Mail, AlertCircle } from "lucide-react"
 
 export default function SignUpSuccessPage() {
   return (
@@ -27,6 +27,21 @@ export default function SignUpSuccessPage() {
               Please check your email and click the confirmation link to activate your account. Once confirmed, you can
               sign in and start using WebDrop.
             </p>
+
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium">Didn't receive an email?</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Check your spam/junk folder</li>
+                    <li>Make sure you entered the correct email</li>
+                    <li>Wait a few minutes and check again</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <Button asChild className="w-full py-6 text-base font-semibold bg-gradient-to-r from-primary to-primary/80">
               <Link href="/auth/login">Go to Sign In</Link>
             </Button>

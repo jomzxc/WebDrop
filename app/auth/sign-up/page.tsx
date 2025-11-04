@@ -33,8 +33,18 @@ export default function SignUpPage() {
       return
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long")
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log("[v0] Starting sign up process...")
+      console.log("[v0] Email:", email)
+      console.log("[v0] Redirect URL:", `${window.location.origin}/auth/callback`)
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -44,9 +54,32 @@ export default function SignUpPage() {
           },
         },
       })
+
+      console.log("[v0] Sign up response:", { data, error })
+
       if (error) throw error
-      router.push("/auth/sign-up-success")
+
+      if (data.user) {
+        console.log("[v0] User created:", data.user.id)
+        console.log("[v0] Email confirmed:", data.user.email_confirmed_at)
+        console.log("[v0] Confirmation sent at:", data.user.confirmation_sent_at)
+
+        // If user is already confirmed (auto-confirm enabled), redirect to home
+        if (data.user.email_confirmed_at) {
+          console.log("[v0] User auto-confirmed, redirecting to home")
+          router.push("/")
+        } else {
+          // Email confirmation required
+          console.log("[v0] Email confirmation required, redirecting to success page")
+          router.push("/auth/sign-up-success")
+        }
+      } else {
+        console.log("[v0] No user data returned")
+        // Fallback: assume email confirmation is needed
+        router.push("/auth/sign-up-success")
+      }
     } catch (error: unknown) {
+      console.error("[v0] Sign up error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
@@ -103,7 +136,9 @@ export default function SignUpPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="py-3 bg-muted/40 border-border/50"
+                  minLength={6}
                 />
+                <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="repeat-password">Confirm Password</Label>
@@ -114,6 +149,7 @@ export default function SignUpPage() {
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}
                   className="py-3 bg-muted/40 border-border/50"
+                  minLength={6}
                 />
               </div>
               {error && (
