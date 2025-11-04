@@ -35,6 +35,15 @@ export default function Home() {
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
 
+  // This runs once when the component mounts
+  useEffect(() => {
+    const storedRoomId = sessionStorage.getItem("webdrop-roomId")
+    if (storedRoomId) {
+      setRoomId(storedRoomId)
+      setConnected(true)
+    }
+  }, []) // Empty dependency array ensures this runs only once on mount
+
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
       console.log("[v0] 🆕 Creating connection to peer:", {
@@ -350,6 +359,7 @@ export default function Home() {
         finalRoomId = id
       }
 
+      sessionStorage.setItem("webdrop-roomId", finalRoomId)
       setRoomId(finalRoomId)
       setConnected(true)
       console.log("[v0] ✅ Connected to room:", finalRoomId)
@@ -367,6 +377,8 @@ export default function Home() {
     setIsChannelReady(false)
     signalingChannelRef.current = null
     await leaveRoom(roomId)
+
+    sessionStorage.removeItem("webdrop-roomId")
     setRoomId("")
     setConnected(false)
   }
