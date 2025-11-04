@@ -38,7 +38,8 @@ create table if not exists public.rooms (
 -- Enable RLS on rooms
 alter table public.rooms enable row level security;
 
--- Rooms policies - anyone can view active rooms, only creator can update/delete
+-- Updated room policies to match current database state
+-- Rooms policies - anyone can view active rooms, only creator can update/delete if room is empty
 create policy "rooms_select_active"
   on public.rooms for select
   using (is_active = true);
@@ -47,13 +48,27 @@ create policy "rooms_insert_authenticated"
   on public.rooms for insert
   with check (auth.uid() = created_by);
 
-create policy "rooms_update_own"
+create policy "rooms_update_if_empty"
   on public.rooms for update
-  using (auth.uid() = created_by);
+  using (
+    auth.uid() = created_by AND
+    NOT EXISTS (
+      SELECT 1 FROM public.peers
+      WHERE peers.room_id = rooms.id
+      AND peers.user_id != auth.uid()
+    )
+  );
 
-create policy "rooms_delete_own"
+create policy "rooms_delete_if_empty"
   on public.rooms for delete
-  using (auth.uid() = created_by);
+  using (
+    auth.uid() = created_by AND
+    NOT EXISTS (
+      SELECT 1 FROM public.peers
+      WHERE peers.room_id = rooms.id
+      AND peers.user_id != auth.uid()
+    )
+  );
 
 -- Create peers table to track who's in which room
 -- Removed avatar_url column - it should only exist in profiles table
