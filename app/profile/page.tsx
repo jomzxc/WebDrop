@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } in "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,8 +11,29 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2 } from "lucide-react"
+import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Palette, X, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
+
+const PREMADE_AVATARS = [
+  "bg-gradient-to-br from-blue-500 to-purple-600",
+  "bg-gradient-to-br from-green-400 to-blue-500",
+  "bg-gradient-to-br from-yellow-400 to-orange-500",
+  "bg-gradient-to-br from-pink-500 to-red-500",
+  "bg-gradient-to-br from-indigo-500 to-violet-600",
+  "bg-gradient-to-br from-teal-400 to-cyan-500",
+  "bg-gradient-to-br from-lime-400 to-green-600",
+  "bg-gradient-to-br from-rose-400 to-pink-600",
+]
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
@@ -25,11 +45,16 @@ export default function ProfilePage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     fetchUserData()
   }, [])
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (forceRefresh: boolean = false) => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -42,11 +67,27 @@ export default function ProfilePage() {
     setUser(user)
     setIdentities(user.identities || [])
 
+    const providerAvatar = user.user_metadata?.avatar_url
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
     if (profileData) {
-      setProfile(profileData)
-      setUsername(profileData.username || "")
+      if (!profileData.avatar_url && providerAvatar) {
+        const { data: updatedProfile } = await supabase
+          .from("profiles")
+          .update({ avatar_url: providerAvatar })
+          .eq("id", user.id)
+          .select()
+          .single()
+        setProfile(updatedProfile || profileData)
+        setUsername(updatedProfile?.username || profileData.username || "")
+      } else {
+        setProfile(profileData)
+        setUsername(profileData.username || "")
+      }
+    }
+
+    if (forceRefresh) {
+      router.refresh()
     }
   }
 
@@ -61,7 +102,7 @@ export default function ProfilePage() {
       if (error) throw error
 
       setMessage({ type: "success", text: "Profile updated successfully!" })
-      fetchUserData()
+      fetchUserData(true) // Force refresh to update header
     } catch (error: any) {
       setMessage({ type: "error", text: error.message })
     } finally {
@@ -71,9 +112,7 @@ export default function ProfilePage() {
 
   const handleLinkAccount = async (provider: "github") => {
     try {
-      const { error } = await supabase.auth.linkIdentity({
-        provider,
-      })
+      const { error } = await supabase.auth.linkIdentity({ provider })
       if (error) throw error
     } catch (error: any) {
       setMessage({ type: "error", text: error.message })
@@ -82,15 +121,93 @@ export default function ProfilePage() {
 
   const handleUnlinkAccount = async (identityId: string) => {
     try {
-      const { error } = await supabase.auth.unlinkIdentity({
-        identity_id: identityId,
-      })
+      const { error } = await supabase.auth.unlinkIdentity({ identity_id: identityId })
       if (error) throw error
       setMessage({ type: "success", text: "Account unlinked successfully!" })
-      fetchUserData()
+      fetchUserData(true)
     } catch (error: any) {
       setMessage({ type: "error", text: error.message })
     }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setIsUploading(true)
+    setMessage(null)
+
+    try {
+      const resizedBlob = await resizeImage(file, 150)
+
+      const fileExtension = file.name.split(".").pop() || "png"
+      const filePath = `${user.id}.${fileExtension}`
+
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, resizedBlob, {
+        cacheControl: "3600",
+        upsert: true,
+      })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath)
+      const newAvatarUrl = `${data.publicUrl}?t=${new Date().getTime()}` // Add timestamp to break cache
+
+      await updateAvatarUrl(newAvatarUrl)
+    } catch (error: any) {
+      setMessage({ type: "error", text: error.message || "Failed to upload avatar" })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleSelectPremade = async (gradientClass: string) => {
+    setSelectedAvatar(gradientClass) // Show selection
+    try {
+      await updateAvatarUrl(gradientClass)
+    } catch (error: any) {
+      setMessage({ type: "error", text: error.message || "Failed to select avatar" })
+    }
+  }
+
+  const updateAvatarUrl = async (newUrl: string) => {
+    if (!user) return
+    const { error } = await supabase.from("profiles").update({ avatar_url: newUrl }).eq("id", user.id)
+    if (error) throw error
+
+    await fetchUserData(true) // Re-fetch user data and refresh router
+    setIsAvatarModalOpen(false) // Close modal on success
+  }
+
+  const resizeImage = (file: File, size: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement("canvas")
+          canvas.width = size
+          canvas.height = size
+          const ctx = canvas.getContext("2d")
+          if (!ctx) return reject(new Error("Failed to get canvas context"))
+
+          ctx.drawImage(img, 0, 0, size, size)
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error("Failed to create blob"))
+              resolve(blob)
+            },
+            "image/png",
+            0.8,
+          ) // Compress to 80% quality PNG
+        }
+        img.src = e.target?.result as string
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   const getProviderIcon = (provider: string) => {
@@ -121,164 +238,242 @@ export default function ProfilePage() {
 
   if (!user) return null
 
+  const isPremadeAvatar = profile?.avatar_url?.startsWith("bg-")
+
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
-      </div>
+    <>
+      <main className="min-h-screen bg-background text-foreground">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
+          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
+        </div>
 
-      <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header */}
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
-              Profile Settings
-            </h1>
-            <p className="text-muted-foreground">Manage your account settings and linked providers</p>
-          </div>
+        <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
+                Profile Settings
+              </h1>
+              <p className="text-muted-foreground">Manage your account settings and linked providers</p>
+            </div>
 
-          {message && (
-            <Alert
-              className={
-                message.type === "error" ? "border-red-500/50 bg-red-500/10" : "border-green-500/50 bg-green-500/10"
-              }
-            >
-              <AlertDescription
+            {message && (
+              <Alert
                 className={
-                  message.type === "error" ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                  message.type === "error" ? "border-red-500/50 bg-red-500/10" : "border-green-500/50 bg-green-500/10"
                 }
               >
-                {message.text}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Profile Information */}
-          <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
-                Profile Information
-              </CardTitle>
-              <CardDescription>Update your profile details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-6">
-                <Avatar className="h-20 w-20 border-4 border-primary/20">
-                  <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={username || user.email} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-2xl font-semibold">
-                    {getInitials(username, user.email)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm text-muted-foreground">Profile Picture</p>
-                  <p className="text-xs text-muted-foreground mt-1">Synced from your linked accounts</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="bg-muted/40 border-border/50"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={user.email} disabled className="bg-muted/20 border-border/30" />
-                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                <AlertDescription
+                  className={
+                    message.type === "error" ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                  }
                 >
-                  {isLoading ? "Saving..." : "Save Changes"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  {message.text}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {/* Linked Accounts */}
-          <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LinkIcon className="w-5 h-5 text-primary" />
-                Linked Accounts
-              </CardTitle>
-              <CardDescription>Manage your connected authentication providers</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Current Identities */}
-              <div className="space-y-3">
-                {identities.map((identity) => (
-                  <div
-                    key={identity.id}
-                    className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/20"
+            <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  Profile Information
+                </CardTitle>
+                <CardDescription>Update your profile details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center gap-6">
+                  {/* --- NEW: Avatar is now a button --- */}
+                  <button
+                    onClick={() => setIsAvatarModalOpen(true)}
+                    className="relative group cursor-pointer"
+                    aria-label="Change profile picture"
                   >
-                    <div className="flex items-center gap-3">
-                      {getProviderIcon(identity.provider)}
-                      <div>
-                        <p className="font-medium flex items-center gap-2">
-                          {getProviderName(identity.provider)}
-                          {identity.provider === "email" && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Shield className="w-3 h-3 mr-1" />
-                              Primary
-                            </Badge>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{identity.identity_data?.email || "Connected"}</p>
+                    <Avatar className="h-20 w-20 border-4 border-primary/20">
+                      {!isPremadeAvatar && (
+                        <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={username || user.email} />
+                      )}
+                      <AvatarFallback
+                        className={cn(
+                          "bg-gradient-to-br from-primary to-accent text-white text-2xl font-semibold",
+                          isPremadeAvatar && profile.avatar_url,
+                        )}
+                      >
+                        {getInitials(username, user.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Upload className="w-8 h-8 text-white" />
+                    </div>
+                  </button>
+                  <Button onClick={() => setIsAvatarModalOpen(true)} variant="outline">
+                    Change Avatar
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="bg-muted/40 border-border/50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={user.email} disabled className="bg-muted/20 border-border/30" />
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    {isLoading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="backdrop-blur-xl border-border/50 bg-card/40 shadow-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LinkIcon className="w-5 h-5 text-primary" />
+                  Linked Accounts
+                </CardTitle>
+                <CardDescription>Manage your connected authentication providers</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {identities.map((identity) => (
+                    <div
+                      key={identity.id}
+                      className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-muted/20"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getProviderIcon(identity.provider)}
+                        <div>
+                          <p className="font-medium flex items-center gap-2">
+                            {getProviderName(identity.provider)}
+                            {identity.provider === "email" && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Primary
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{identity.identity_data?.email || "Connected"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        {identity.provider !== "email" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnlinkAccount(identity.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      {identity.provider !== "email" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleUnlinkAccount(identity.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+                  ))}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Link Additional Accounts</p>
+                  <div className="grid gap-3">
+                    {!identities.some((i) => i.provider === "github") && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handleLinkAccount("github")}
+                        className="justify-start border-border/50 hover:bg-muted/50"
+                      >
+                        {getProviderIcon("github")}
+                        <span className="ml-3">Link GitHub Account</span>
+                      </Button>
+                    )}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+
+      <Dialog open={isAvatarModalOpen} onOpenChange={setIsAvatarModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Profile Picture</DialogTitle>
+            <DialogDescription>Select a pre-made avatar or upload your own.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                Select an Avatar
+              </Label>
+              <div className="grid grid-cols-4 gap-3">
+                {PREMADE_AVATARS.map((gradient) => (
+                  <button
+                    key={gradient}
+                    onClick={() => handleSelectPremade(gradient)}
+                    className={cn(
+                      "h-16 w-16 rounded-full transition-all",
+                      gradient,
+                      selectedAvatar === gradient && "ring-2 ring-primary ring-offset-2",
+                    )}
+                  />
                 ))}
               </div>
+            </div>
 
-              <Separator />
+            <Separator />
 
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Link Additional Accounts</p>
-                <div className="grid gap-3">
-                  {!identities.some((i) => i.provider === "github") && (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleLinkAccount("github")}
-                      className="justify-start border-border/50 hover:bg-muted/50"
-                    >
-                      {getProviderIcon("github")}
-                      <span className="ml-3">Link GitHub Account</span>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </main>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Your Own
+              </Label>
+              <Button variant="outline" className="w-full" onClick={handleUploadClick} disabled={isUploading}>
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-2" />
+                )}
+                {isUploading ? "Uploading..." : "Upload Image"}
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/png, image/jpeg"
+                disabled={isUploading}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">
+                Cancel
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
