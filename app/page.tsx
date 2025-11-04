@@ -23,6 +23,7 @@ export default function Home() {
   const [isChannelReady, setIsChannelReady] = useState(false)
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map())
   const previousPeerIdsRef = useRef<Set<string>>(new Set())
+  const pendingSignalsRef = useRef<Map<string, any[]>>(new Map())
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -34,6 +35,53 @@ export default function Home() {
   useEffect(() => {
     peerConnectionsRef.current = peerConnections
   }, [peerConnections])
+
+  const createPeerConnection = useCallback(
+    (peerId: string, username: string, isInitiator: boolean) => {
+      console.log("[v0] 🆕 Creating connection to peer:", {
+        username,
+        peerId: peerId.substring(0, 8),
+        isInitiator,
+      })
+
+      const pc = new PeerConnection(peerId, isInitiator, (signal) => {
+        console.log("[v0] 📤 PeerConnection wants to send signal:", signal.type)
+        sendSignalRef.current?.(peerId, signal)
+      })
+
+      pc.onData((data) => {
+        if (!data || !data.type) return
+
+        if (data.type === "file-metadata") {
+          handleFileMetadata(data.metadata, username)
+        } else if (data.type === "file-chunk") {
+          handleFileChunk(data.chunk)
+        } else if (data.type === "file-complete") {
+          handleFileComplete(data.fileId)
+        }
+      })
+
+      pc.onStateChange((state) => {
+        console.log("[v0] 🔄 Connection state changed:", {
+          peer: username,
+          peerId: peerId.substring(0, 8),
+          state,
+        })
+      })
+
+      pc.onError((error) => {
+        console.error("[v0] ❌ Connection error with", username, ":", error)
+        toast({
+          title: "Connection error",
+          description: `Failed to connect to ${username}`,
+          variant: "destructive",
+        })
+      })
+
+      return pc
+    },
+    [handleFileMetadata, handleFileChunk, handleFileComplete, toast],
+  )
 
   sendSignalRef.current = async (toPeerId: string, signal: any) => {
     if (!user || !roomId || !signalingChannelRef.current || !isChannelReady) {
@@ -119,15 +167,33 @@ export default function Home() {
         return
       }
 
-      const connection = peerConnectionsRef.current.get(fromPeerId)
+      let connection = peerConnectionsRef.current.get(fromPeerId)
 
       if (!connection) {
-        console.error("[v0] ❌ No connection found for peer:", fromPeerId.substring(0, 8))
-        console.log(
-          "[v0] Available connections:",
-          Array.from(peerConnectionsRef.current.keys()).map((id) => id.substring(0, 8)),
-        )
-        return
+        console.log("[v0] 🔧 No connection found, checking if peer exists in list")
+
+        await refreshPeers()
+
+        const peer = peers.find((p) => p.user_id === fromPeerId)
+
+        if (peer) {
+          console.log("[v0] ✨ Creating connection for new peer:", peer.username)
+          const isInitiator = user.id < fromPeerId
+          const newConnection = createPeerConnection(fromPeerId, peer.username, isInitiator)
+
+          const newConnections = new Map(peerConnectionsRef.current)
+          newConnections.set(fromPeerId, newConnection)
+          setPeerConnections(newConnections)
+          peerConnectionsRef.current = newConnections
+
+          connection = newConnection
+        } else {
+          console.log("[v0] 📦 Buffering signal from unknown peer:", fromPeerId.substring(0, 8))
+          const buffer = pendingSignalsRef.current.get(fromPeerId) || []
+          buffer.push(signal)
+          pendingSignalsRef.current.set(fromPeerId, buffer)
+          return
+        }
       }
 
       try {
@@ -168,7 +234,7 @@ export default function Home() {
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
     }
-  }, [connected, user, roomId])
+  }, [connected, user, roomId, peers, refreshPeers, createPeerConnection])
 
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
@@ -179,19 +245,16 @@ export default function Home() {
     const currentPeerIds = new Set(peers.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
     const previousPeerIds = previousPeerIdsRef.current
 
-    // Check if peer list actually changed
     const peersChanged =
       currentPeerIds.size !== previousPeerIds.size || Array.from(currentPeerIds).some((id) => !previousPeerIds.has(id))
 
     if (!peersChanged) {
-      // Peer list hasn't changed, don't recreate connections
       return
     }
 
     console.log("[v0] 👥 Peer list changed, updating connections")
     previousPeerIdsRef.current = currentPeerIds
 
-    // Add a small delay to ensure the other peer's signaling channel is also ready
     const timer = setTimeout(() => {
       const currentPeers = peers.filter((p) => p.user_id !== user.id)
       const newConnections = new Map(peerConnections)
@@ -204,51 +267,30 @@ export default function Home() {
         })),
       )
 
-      // Add new peer connections
       currentPeers.forEach((peer) => {
         if (!newConnections.has(peer.user_id)) {
           const isInitiator = user.id < peer.user_id
-          console.log("[v0] 🆕 Creating connection to peer:", {
-            username: peer.username,
-            peerId: peer.user_id.substring(0, 8),
-            isInitiator,
-          })
-
-          const pc = new PeerConnection(peer.user_id, isInitiator, (signal) => {
-            console.log("[v0] 📤 PeerConnection wants to send signal:", signal.type)
-            sendSignal(peer.user_id, signal)
-          })
-
-          pc.onData((data) => {
-            if (!data || !data.type) return
-
-            if (data.type === "file-metadata") {
-              handleFileMetadata(data.metadata, peer.username)
-            } else if (data.type === "file-chunk") {
-              handleFileChunk(data.chunk)
-            } else if (data.type === "file-complete") {
-              handleFileComplete(data.fileId)
-            }
-          })
-
-          pc.onStateChange((state) => {
-            console.log("[v0] 🔄 Connection state changed:", {
-              peer: peer.username,
-              peerId: peer.user_id.substring(0, 8),
-              state,
-            })
-          })
-
-          pc.onError((error) => {
-            console.error("[v0] ❌ Connection error with", peer.username, ":", error)
-            toast({
-              title: "Connection error",
-              description: `Failed to connect to ${peer.username}`,
-              variant: "destructive",
-            })
-          })
-
+          const pc = createPeerConnection(peer.user_id, peer.username, isInitiator)
           newConnections.set(peer.user_id, pc)
+
+          const bufferedSignals = pendingSignalsRef.current.get(peer.user_id)
+          if (bufferedSignals && bufferedSignals.length > 0) {
+            console.log("[v0] 📦 Processing", bufferedSignals.length, "buffered signals for peer:", peer.username)
+            bufferedSignals.forEach(async (signal) => {
+              try {
+                if (signal.type === "offer") {
+                  await pc.handleOffer(signal.offer)
+                } else if (signal.type === "answer") {
+                  await pc.handleAnswer(signal.answer)
+                } else if (signal.type === "ice-candidate") {
+                  await pc.handleIceCandidate(signal.candidate)
+                }
+              } catch (error) {
+                console.error("[v0] ❌ Error processing buffered signal:", error)
+              }
+            })
+            pendingSignalsRef.current.delete(peer.user_id)
+          }
 
           if (isInitiator) {
             console.log("[v0] 🚀 Creating offer for peer:", peer.username)
@@ -268,12 +310,12 @@ export default function Home() {
         }
       })
 
-      // Clean up connections for peers that left
       Array.from(newConnections.keys()).forEach((peerId) => {
         if (!currentPeerIds.has(peerId)) {
           console.log("[v0] 🗑️  Peer left, closing connection:", peerId.substring(0, 8))
           newConnections.get(peerId)?.close()
           newConnections.delete(peerId)
+          pendingSignalsRef.current.delete(peerId)
         }
       })
 
@@ -283,18 +325,7 @@ export default function Home() {
     return () => {
       clearTimeout(timer)
     }
-  }, [
-    peers,
-    connected,
-    user,
-    isChannelReady,
-    peerConnections,
-    handleFileMetadata,
-    handleFileChunk,
-    handleFileComplete,
-    toast,
-    sendSignal,
-  ])
+  }, [peers, connected, user, isChannelReady, peerConnections, toast, createPeerConnection])
 
   useEffect(() => {
     return () => {
@@ -302,6 +333,7 @@ export default function Home() {
         console.log("[v0] 🧹 Component unmounting, cleaning up all peer connections")
         peerConnections.forEach((conn) => conn.close())
       }
+      pendingSignalsRef.current.clear()
     }
   }, [])
 
@@ -331,6 +363,7 @@ export default function Home() {
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
     previousPeerIdsRef.current = new Set()
+    pendingSignalsRef.current.clear()
     setIsChannelReady(false)
     signalingChannelRef.current = null
     await leaveRoom(roomId)
