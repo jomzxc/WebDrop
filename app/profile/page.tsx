@@ -149,7 +149,7 @@ export default function ProfilePage() {
 
       const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, resizedBlob, {
         cacheControl: "3600",
-        upsert: true,
+        upsert: true, // Overwrite if exists
       })
       if (uploadError) throw uploadError
 
@@ -283,7 +283,6 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center gap-6">
-                  {/* --- NEW: Avatar is now a button --- */}
                   <button
                     onClick={() => setIsAvatarModalOpen(true)}
                     className="relative group cursor-pointer"
@@ -420,6 +419,7 @@ export default function ProfilePage() {
             <DialogDescription>Select a pre-made avatar or upload your own.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Pre-made Avatars */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Palette className="w-4 h-4" />
@@ -442,6 +442,7 @@ export default function ProfilePage() {
 
             <Separator />
 
+            {/* Custom Upload */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Upload className="w-4 h-4" />
