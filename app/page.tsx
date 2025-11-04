@@ -31,7 +31,9 @@ export default function Home() {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
-  const { peers, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(connected ? roomId : null)
+  const { peers, onlineUserIds, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(
+    connected ? roomId : null,
+  )
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete } = useFileTransfer(roomId)
 
   const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
@@ -43,27 +45,6 @@ export default function Home() {
       setConnected(true)
     }
   }, [])
-
-  useEffect(() => {
-    const handleUnload = () => {
-      // Only run this logic if the user is actually in a room
-      if (connected && roomId) {
-        // We must use navigator.sendBeacon for a reliable "fire-and-forget"
-        // request that runs as the page is closing.
-        // We can't use an async fetch here, as the browser won't wait for it.
-        const data = new Blob([JSON.stringify({ roomId })], { type: "application/json" })
-        navigator.sendBeacon("/api/rooms/leave", data)
-      }
-    }
-
-    // Add the event listener when the component mounts
-    window.addEventListener("beforeunload", handleUnload)
-
-    // Return a cleanup function to remove the listener
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload)
-    }
-  }, [connected, roomId]) // Dependencies: ensure the handler has the current room state
 
   const createPeerConnection = useCallback(
     (peerId: string, username: string, isInitiator: boolean) => {
@@ -155,6 +136,8 @@ export default function Home() {
     const channel = supabase.channel(`room:${roomId}:signaling`, {
       config: {
         broadcast: { self: false, ack: false },
+        // We link this channel's presence to the one in useRoom
+        presence: { key: user.id },
       },
     })
 
@@ -361,7 +344,14 @@ export default function Home() {
     previousPeerIdsRef.current = new Set()
     pendingSignalsRef.current.clear()
     setIsChannelReady(false)
+    
+    // Manually untrack from presence before calling leaveRoom
+    const channel = signalingChannelRef.current
+    if (channel) {
+      await channel.untrack()
+    }
     signalingChannelRef.current = null
+
     await leaveRoom(roomId)
 
     sessionStorage.removeItem("webdrop-roomId")
@@ -468,6 +458,8 @@ export default function Home() {
                       onRefresh={refreshPeersRef.current}
                       currentUserId={user.id}
                       connectionStates={peerConnectionStates}
+                      // --- Pass the live list of online users ---
+                      onlineUserIds={onlineUserIds}
                     />
                   </>
                 ) : (
