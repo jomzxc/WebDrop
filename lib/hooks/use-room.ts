@@ -12,7 +12,7 @@ export function useRoom(roomId: string | null) {
   const [isLoading, setIsLoading] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Removed pollingIntervalRef
 
   const fetchPeers = useCallback(async () => {
     if (!roomId) return
@@ -27,11 +27,10 @@ export function useRoom(roomId: string | null) {
       if (error) throw error
 
       if (data) {
-        console.log("[v0] Fetched peers:", data.length, "peers")
         setPeers(data)
       }
     } catch (error) {
-      console.error("[v0] Error fetching peers:", error)
+      console.error("Error fetching peers:", error)
       toast({
         title: "Failed to fetch peers",
         description: "Could not load room participants",
@@ -43,21 +42,12 @@ export function useRoom(roomId: string | null) {
   useEffect(() => {
     if (!roomId) {
       setPeers([])
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
       return
     }
 
-    console.log("[v0] Setting up room subscription for:", roomId)
-
     fetchPeers()
 
-    pollingIntervalRef.current = setInterval(() => {
-      console.log("[v0] Polling for peer updates...")
-      fetchPeers()
-    }, 3000)
+    // Removed setInterval logic
 
     const channel = supabase
       .channel(`room:${roomId}`, {
@@ -75,32 +65,22 @@ export function useRoom(roomId: string | null) {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log("[v0] Realtime event received:", payload.eventType, payload)
-
           fetchPeers()
         },
       )
       .subscribe((status, err) => {
-        console.log("[v0] Subscription status:", status)
         if (err) {
-          console.error("[v0] Subscription error:", err)
+          console.error("Subscription error:", err)
           toast({
             title: "Realtime connection issue",
-            description: "Using polling fallback for updates",
-            variant: "default",
+            description: "Could not connect to room updates",
+            variant: "destructive",
           })
-        }
-        if (status === "SUBSCRIBED") {
-          console.log("[v0] Realtime subscription active!")
         }
       })
 
     return () => {
-      console.log("[v0] Cleaning up room subscription")
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
+      // Removed clearInterval logic
       supabase.removeChannel(channel)
     }
   }, [roomId, fetchPeers, supabase, toast])
