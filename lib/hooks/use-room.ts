@@ -26,9 +26,11 @@ export function useRoom(roomId: string | null) {
       if (error) throw error
 
       if (data) {
+        console.log("[v0] Fetched peers:", data) // Added debug logging
         setPeers(data)
       }
     } catch (error) {
+      console.error("[v0] Error fetching peers:", error) // Added debug logging
       toast({
         title: "Failed to fetch peers",
         description: "Could not load room participants",
@@ -40,11 +42,16 @@ export function useRoom(roomId: string | null) {
   useEffect(() => {
     if (!roomId) return
 
+    console.log("[v0] Setting up room subscription for:", roomId) // Added debug logging
     fetchPeers()
 
-    // Subscribe to peer changes
     const channel = supabase
-      .channel(`room:${roomId}`)
+      .channel(`room:${roomId}:peers`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: "" },
+        },
+      })
       .on(
         "postgres_changes",
         {
@@ -53,14 +60,18 @@ export function useRoom(roomId: string | null) {
           table: "peers",
           filter: `room_id=eq.${roomId}`,
         },
-        () => {
+        (payload) => {
+          console.log("[v0] Peer change detected:", payload) // Added debug logging
           fetchPeers()
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("[v0] Subscription status:", status) // Added debug logging
+      })
 
     return () => {
-      channel.unsubscribe()
+      console.log("[v0] Cleaning up room subscription") // Added debug logging
+      supabase.removeChannel(channel)
     }
   }, [roomId, fetchPeers, supabase])
 
@@ -136,7 +147,6 @@ export function useRoom(roomId: string | null) {
         description: errorMessage,
         variant: "destructive",
       })
-      throw error
     } finally {
       setIsLoading(false)
     }

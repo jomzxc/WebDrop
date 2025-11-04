@@ -36,6 +36,60 @@ export default function Home() {
   }, [router, supabase])
 
   useEffect(() => {
+    if (!connected || !user || !roomId) return
+
+    console.log("[v0] Setting up signaling subscription for user:", user.id) // Added debug logging
+
+    const signalingChannel = supabase
+      .channel(`signaling:${roomId}:${user.id}`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: "" },
+        },
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "signaling",
+          filter: `to_peer_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log("[v0] Received signal:", payload) // Added debug logging
+          const signal = payload.new.signal_data
+          const fromPeerId = payload.new.from_peer_id
+          const connection = peerConnections.get(fromPeerId)
+
+          if (!connection) {
+            console.error("[v0] No connection found for peer:", fromPeerId) // Added debug logging
+            return
+          }
+
+          try {
+            if (signal.type === "offer") {
+              await connection.handleOffer(signal.offer)
+            } else if (signal.type === "answer") {
+              await connection.handleAnswer(signal.answer)
+            } else if (signal.type === "ice-candidate") {
+              await connection.handleIceCandidate(signal.candidate)
+            }
+          } catch (error) {
+            console.error("[v0] Error handling signal:", error) // Added debug logging
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log("[v0] Signaling subscription status:", status) // Added debug logging
+      })
+
+    return () => {
+      console.log("[v0] Cleaning up signaling subscription") // Added debug logging
+      supabase.removeChannel(signalingChannel)
+    }
+  }, [connected, user, roomId, peerConnections, supabase])
+
+  useEffect(() => {
     if (!connected || !user) return
 
     const currentPeers = peers.filter((p) => p.user_id !== user.id)
@@ -80,7 +134,7 @@ export default function Home() {
     })
 
     Array.from(newConnections.keys()).forEach((peerId) => {
-      if (!currentPeers.find((p) => p.user_id === peerId)) {
+      if (!peers.find((p) => p.user_id === peerId)) {
         newConnections.get(peerId)?.close()
         newConnections.delete(peerId)
       }
@@ -122,6 +176,8 @@ export default function Home() {
       const peer = peers.find((p) => p.user_id === peerId)
       const connection = peerConnections.get(peerId)
 
+      console.log("[v0] File select - Peer:", peer?.username, "Connection:", connection?.getConnectionState()) // Added debug logging
+
       if (!peer || !connection) {
         toast({
           title: "Connection not ready",
@@ -131,10 +187,13 @@ export default function Home() {
         return
       }
 
-      if (connection.getConnectionState() !== "connected") {
+      const connectionState = connection.getConnectionState()
+      console.log("[v0] Connection state:", connectionState) // Added debug logging
+
+      if (connectionState !== "connected") {
         toast({
           title: "Connection not ready",
-          description: "Wait for peer connection to establish",
+          description: `Connection state: ${connectionState}. Please wait...`,
           variant: "destructive",
         })
         return
