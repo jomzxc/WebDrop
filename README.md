@@ -51,29 +51,29 @@ To run this project, you will need a Supabase project.
 ### 2. Local Development
 
 1.  Clone the repository:
-    ```bash
+    \`\`\`bash
     git clone [https://github.com/](https://github.com/)[YOUR_USERNAME]/[YOUR_REPO].git
     cd [YOUR_REPO]
-    ```
+    \`\`\`
 
 2.  Install dependencies (using `pnpm` as defined in your lockfile):
-    ```bash
+    \`\`\`bash
     pnpm install
-    ```
+    \`\`\`
 
 3.  Set up environment variables:
     * Find your Supabase Project URL and Anon Key in **Project Settings** -> **API**.
     * Create a new file named `.env.local` in the root of the project.
     * Add your keys to it:
-        ```
+        \`\`\`
         NEXT_PUBLIC_SUPABASE_URL=https://[YOUR-PROJECT-REF].supabase.co
         NEXT_PUBLIC_SUPABASE_ANON_KEY=[YOUR-ANON-KEY]
-        ```
+        \`\`\`
 
 4.  Run the development server:
-    ```bash
+    \`\`\`bash
     pnpm dev
-    ```
+    \`\`\`
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the running application.
 
