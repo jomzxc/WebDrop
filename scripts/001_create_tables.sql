@@ -61,6 +61,7 @@ create table if not exists public.peers (
   room_id text references public.rooms(id) on delete cascade,
   user_id uuid references auth.users(id) on delete cascade,
   username text not null,
+  avatar_url text,
   joined_at timestamp with time zone default now(),
   last_seen timestamp with time zone default now(),
   unique(room_id, user_id)
@@ -114,3 +115,5 @@ create policy "file_transfers_insert_own"
 create policy "file_transfers_update_involved"
   on public.file_transfers for update
   using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+}
