@@ -22,6 +22,7 @@ export default function Home() {
   const signalingChannelRef = useRef<RealtimeChannel | null>(null)
   const [isChannelReady, setIsChannelReady] = useState(false)
   const peerConnectionsRef = useRef<Map<string, PeerConnection>>(new Map())
+  const previousPeerIdsRef = useRef<Set<string>>(new Set())
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -175,7 +176,20 @@ export default function Home() {
       return
     }
 
-    console.log("[v0] 👥 Processing peers:", peers.length)
+    const currentPeerIds = new Set(peers.filter((p) => p.user_id !== user.id).map((p) => p.user_id))
+    const previousPeerIds = previousPeerIdsRef.current
+
+    // Check if peer list actually changed
+    const peersChanged =
+      currentPeerIds.size !== previousPeerIds.size || Array.from(currentPeerIds).some((id) => !previousPeerIds.has(id))
+
+    if (!peersChanged) {
+      // Peer list hasn't changed, don't recreate connections
+      return
+    }
+
+    console.log("[v0] 👥 Peer list changed, updating connections")
+    previousPeerIdsRef.current = currentPeerIds
 
     // Add a small delay to ensure the other peer's signaling channel is also ready
     const timer = setTimeout(() => {
@@ -190,6 +204,7 @@ export default function Home() {
         })),
       )
 
+      // Add new peer connections
       currentPeers.forEach((peer) => {
         if (!newConnections.has(peer.user_id)) {
           const isInitiator = user.id < peer.user_id
@@ -237,7 +252,6 @@ export default function Home() {
 
           if (isInitiator) {
             console.log("[v0] 🚀 Creating offer for peer:", peer.username)
-            // Add a small delay before creating offer to ensure signaling is fully ready
             setTimeout(() => {
               pc.createOffer().catch((error) => {
                 console.error("[v0] ❌ Failed to create offer:", error)
@@ -254,17 +268,17 @@ export default function Home() {
         }
       })
 
-      // Clean up removed peers
+      // Clean up connections for peers that left
       Array.from(newConnections.keys()).forEach((peerId) => {
-        if (!peers.find((p) => p.user_id === peerId)) {
-          console.log("[v0] 🗑️  Closing connection to peer:", peerId.substring(0, 8))
+        if (!currentPeerIds.has(peerId)) {
+          console.log("[v0] 🗑️  Peer left, closing connection:", peerId.substring(0, 8))
           newConnections.get(peerId)?.close()
           newConnections.delete(peerId)
         }
       })
 
       setPeerConnections(newConnections)
-    }, 1000) // Wait 1 second to ensure both peers have signaling ready
+    }, 1000)
 
     return () => {
       clearTimeout(timer)
@@ -274,6 +288,7 @@ export default function Home() {
     connected,
     user,
     isChannelReady,
+    peerConnections,
     handleFileMetadata,
     handleFileChunk,
     handleFileComplete,
@@ -283,12 +298,12 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
-      peerConnections.forEach((conn) => {
-        console.log("[v0] 🧹 Cleaning up peer connection")
-        conn.close()
-      })
+      if (peerConnections.size > 0) {
+        console.log("[v0] 🧹 Component unmounting, cleaning up all peer connections")
+        peerConnections.forEach((conn) => conn.close())
+      }
     }
-  }, [peerConnections])
+  }, [])
 
   const handleJoinRoom = async (id: string) => {
     try {
@@ -315,6 +330,7 @@ export default function Home() {
     console.log("[v0] 👋 Leaving room")
     peerConnections.forEach((pc) => pc.close())
     setPeerConnections(new Map())
+    previousPeerIdsRef.current = new Set()
     setIsChannelReady(false)
     signalingChannelRef.current = null
     await leaveRoom(roomId)
