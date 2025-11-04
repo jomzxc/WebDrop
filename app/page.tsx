@@ -470,7 +470,7 @@ export default function Home() {
                       transfers={transfers}
                       peers={peersRef.current}
                       onFileSelect={handleFileSelect}
-                      currentUserId={user.id} {}
+                      currentUserId={user.id}
                     />
                     <PeerList peers={peersRef.current} onRefresh={refreshPeersRef.current} />
                   </>
