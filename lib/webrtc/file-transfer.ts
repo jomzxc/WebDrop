@@ -119,4 +119,8 @@ export class FileTransferManager {
   cancelTransfer(fileId: string) {
     this.pendingTransfers.delete(fileId)
   }
+
+  clearPendingTransfers() {
+    this.pendingTransfers.clear()
+  }
 }
