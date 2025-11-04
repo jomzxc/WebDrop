@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Mail, AlertCircle } from "lucide-react"
+import { Mail, AlertCircle, Info } from "lucide-react"
 
 export default function SignUpSuccessPage() {
   return (
@@ -28,6 +28,20 @@ export default function SignUpSuccessPage() {
               sign in and start using WebDrop.
             </p>
 
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 space-y-2">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                  <p className="font-medium">Important Note</p>
+                  <p>
+                    Email confirmation requires proper SMTP configuration in your Supabase project. If you're not
+                    receiving emails, check your Supabase dashboard under Authentication → Email Templates and SMTP
+                    Settings.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-2">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
@@ -37,6 +51,7 @@ export default function SignUpSuccessPage() {
                     <li>Check your spam/junk folder</li>
                     <li>Make sure you entered the correct email</li>
                     <li>Wait a few minutes and check again</li>
+                    <li>Verify SMTP is configured in Supabase</li>
                   </ul>
                 </div>
               </div>

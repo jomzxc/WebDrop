@@ -48,16 +48,13 @@ export default function SignUpPage() {
           data: {
             username: username || email.split("@")[0],
           },
-          // Disable email confirmation requirement
-          emailConfirm: false,
         },
       })
 
       if (error) throw error
 
       if (data.user) {
-        // User is created and auto-confirmed, redirect to home
-        router.push("/")
+        router.push("/auth/sign-up-success")
       }
     } catch (error: unknown) {
       console.error("[v0] Sign up error:", error)
