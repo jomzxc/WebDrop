@@ -11,19 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Loader2 } from "lucide-react"
+import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Loader2, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-const PREMADE_AVATARS = [
-  "bg-gradient-to-br from-blue-500 to-purple-600",
-  "bg-gradient-to-br from-green-400 to-blue-500",
-  "bg-gradient-to-br from-yellow-400 to-orange-500",
-  "bg-gradient-to-br from-pink-500 to-red-500",
-  "bg-gradient-to-br from-indigo-500 to-violet-600",
-  "bg-gradient-to-br from-teal-400 to-cyan-500",
-  "bg-gradient-to-br from-lime-400 to-green-600",
-  "bg-gradient-to-br from-rose-400 to-pink-600",
-]
+import Link from "next/link"
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
@@ -221,6 +211,15 @@ export default function ProfilePage() {
 
       <div className="relative z-10 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
         <div className="max-w-4xl mx-auto space-y-8">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Back to App
+              </Button>
+            </Link>
+          </div>
+
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
               Profile Settings
@@ -253,7 +252,6 @@ export default function ProfilePage() {
               <CardDescription>Upload your own profile picture</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Current Avatar Preview */}
               <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-muted/20 border border-border/50">
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
                   <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
@@ -266,7 +264,6 @@ export default function ProfilePage() {
 
               <Separator />
 
-              {/* Upload Custom Avatar */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-base">
                   <Upload className="w-4 h-4" />
