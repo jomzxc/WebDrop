@@ -130,14 +130,10 @@ export class PeerConnection {
 
   async handleIceCandidate(candidate: RTCIceCandidateInit) {
     try {
-      // Check if remote description is set
       if (!this.pc.remoteDescription) {
-        // Buffer the candidate for later
         this.iceCandidateBuffer.push(candidate)
         return
       }
-
-      // Remote description is set, add candidate immediately
       await this.pc.addIceCandidate(candidate)
     } catch (error) {
       this.onErrorCallback?.(new Error("Failed to add ICE candidate"))
@@ -152,11 +148,9 @@ export class PeerConnection {
       try {
         await this.pc.addIceCandidate(candidate)
       } catch (error) {
-        console.error("[v0] Failed to add buffered ICE candidate:", error)
+        console.error("Failed to add buffered ICE candidate:", error)
       }
     }
-
-    // Clear the buffer
     this.iceCandidateBuffer = []
   }
 
