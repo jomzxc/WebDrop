@@ -94,68 +94,81 @@ export default function Home() {
 
     const channel = supabase.channel(`room:${roomId}`, {
       config: {
-        broadcast: { self: false },
+        broadcast: { self: false, ack: false },
       },
     })
 
-    channel
-      .on("broadcast", { event: "webrtc-signal" }, async (payload) => {
-        const { fromPeerId, toPeerId, signal } = payload.payload
+    channel.on("broadcast", { event: "webrtc-signal" }, async (payload) => {
+      const { fromPeerId, toPeerId, signal } = payload.payload
 
-        console.log("[v0] 📨 Received broadcast:", {
-          from: fromPeerId.substring(0, 8),
-          to: toPeerId.substring(0, 8),
-          type: signal.type,
-          isForMe: toPeerId === user.id,
+      console.log("[v0] 📨 Received broadcast:", {
+        from: fromPeerId.substring(0, 8),
+        to: toPeerId.substring(0, 8),
+        type: signal.type,
+        isForMe: toPeerId === user.id,
+      })
+
+      if (toPeerId !== user.id) {
+        console.log("[v0] ⏭️  Signal not for me, ignoring")
+        return
+      }
+
+      const connection = peerConnections.get(fromPeerId)
+
+      if (!connection) {
+        console.error("[v0] ❌ No connection found for peer:", fromPeerId.substring(0, 8))
+        console.log(
+          "[v0] Available connections:",
+          Array.from(peerConnections.keys()).map((id) => id.substring(0, 8)),
+        )
+        return
+      }
+
+      try {
+        if (signal.type === "offer") {
+          console.log("[v0] 📥 Handling offer from:", fromPeerId.substring(0, 8))
+          await connection.handleOffer(signal.offer)
+        } else if (signal.type === "answer") {
+          console.log("[v0] 📥 Handling answer from:", fromPeerId.substring(0, 8))
+          await connection.handleAnswer(signal.answer)
+        } else if (signal.type === "ice-candidate") {
+          console.log("[v0] 🧊 Handling ICE candidate from:", fromPeerId.substring(0, 8))
+          await connection.handleIceCandidate(signal.candidate)
+        }
+      } catch (error) {
+        console.error("[v0] ❌ Error handling signal:", error)
+      }
+    })
+
+    // Subscribe and handle the subscription status
+    channel.subscribe(async (status, err) => {
+      console.log("[v0] 📡 Signaling channel status:", status, err ? `Error: ${err}` : "")
+
+      if (status === "SUBSCRIBED") {
+        console.log("[v0] ✅ Signaling channel SUBSCRIBED successfully")
+        signalingChannelRef.current = channel
+        setIsChannelReady(true)
+      } else if (status === "CHANNEL_ERROR") {
+        console.error("[v0] ❌ Signaling channel error:", err)
+        setIsChannelReady(false)
+        toast({
+          title: "Connection error",
+          description: "Failed to establish signaling channel",
+          variant: "destructive",
         })
-
-        if (toPeerId !== user.id) {
-          console.log("[v0] ⏭️  Signal not for me, ignoring")
-          return
-        }
-
-        const connection = peerConnections.get(fromPeerId)
-
-        if (!connection) {
-          console.error("[v0] ❌ No connection found for peer:", fromPeerId.substring(0, 8))
-          console.log(
-            "[v0] Available connections:",
-            Array.from(peerConnections.keys()).map((id) => id.substring(0, 8)),
-          )
-          return
-        }
-
-        try {
-          if (signal.type === "offer") {
-            console.log("[v0] 📥 Handling offer from:", fromPeerId.substring(0, 8))
-            await connection.handleOffer(signal.offer)
-          } else if (signal.type === "answer") {
-            console.log("[v0] 📥 Handling answer from:", fromPeerId.substring(0, 8))
-            await connection.handleAnswer(signal.answer)
-          } else if (signal.type === "ice-candidate") {
-            console.log("[v0] 🧊 Handling ICE candidate from:", fromPeerId.substring(0, 8))
-            await connection.handleIceCandidate(signal.candidate)
-          }
-        } catch (error) {
-          console.error("[v0] ❌ Error handling signal:", error)
-        }
-      })
-      .subscribe((status) => {
-        console.log("[v0] 📡 Signaling channel status:", status)
-        if (status === "SUBSCRIBED") {
-          signalingChannelRef.current = channel
-          setIsChannelReady(true)
-          console.log("[v0] ✅ Signaling channel ready")
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setIsChannelReady(false)
-          console.error("[v0] ❌ Signaling channel error:", status)
-          toast({
-            title: "Connection error",
-            description: "Failed to establish signaling channel",
-            variant: "destructive",
-          })
-        }
-      })
+      } else if (status === "TIMED_OUT") {
+        console.error("[v0] ❌ Signaling channel timed out")
+        setIsChannelReady(false)
+        toast({
+          title: "Connection timeout",
+          description: "Signaling channel timed out",
+          variant: "destructive",
+        })
+      } else if (status === "CLOSED") {
+        console.log("[v0] 🔒 Signaling channel closed")
+        setIsChannelReady(false)
+      }
+    })
 
     return () => {
       console.log("[v0] 🧹 Cleaning up signaling channel")
