@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { cn } from "@/lib/utils" // Import cn
+import { cn } from "@/lib/utils"
 
 export default function Header() {
   const [isDark, setIsDark] = useState(false)
@@ -37,17 +37,6 @@ export default function Header() {
     }
 
     window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
-  }, [])
-
-  useEffect(() => {
-    // Get initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-      if (user) {
-        fetchProfile(user.id)
-      }
-    })
 
     // Listen for auth changes
     const {
@@ -61,8 +50,11 @@ export default function Header() {
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      subscription.unsubscribe()
+    }
+  }, [supabase]) // Added supabase to dependency array
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
@@ -107,7 +99,6 @@ export default function Header() {
           </Link>
 
           <div className="flex items-center gap-3">
-            {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
               className="p-2.5 rounded-lg hover:bg-muted transition-colors border border-border/40 text-muted-foreground hover:text-foreground"
@@ -116,7 +107,6 @@ export default function Header() {
               {mounted && isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            {/* User Menu */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
