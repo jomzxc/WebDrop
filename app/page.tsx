@@ -225,7 +225,6 @@ export default function Home() {
     }
   }, [connected, user, roomId])
 
-  // --- MODIFICATION 2: Fixed Dependency Array ---
   // This hook now correctly depends on `peers` state.
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
@@ -325,7 +324,7 @@ export default function Home() {
     return () => {
       clearTimeout(timer)
     }
-  }, [connected, user, isChannelReady, peers, toast, createPeerConnection]) // <-- Correct dependency array
+  }, [connected, user, isChannelReady, peers, toast, createPeerConnection])
 
   useEffect(() => {
     return () => {
@@ -471,6 +470,7 @@ export default function Home() {
                       transfers={transfers}
                       peers={peersRef.current}
                       onFileSelect={handleFileSelect}
+                      currentUserId={user.id} {}
                     />
                     <PeerList peers={peersRef.current} onRefresh={refreshPeersRef.current} />
                   </>
