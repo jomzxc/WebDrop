@@ -21,27 +21,33 @@ export function useRoom(roomId: string | null) {
     try {
       const { data: peersData, error: peersError } = await supabase
         .from("peers")
-        .select(`
-          *,
-          profiles!peers_user_id_fkey (
-            avatar_url
-          )
-        `)
+        .select("*")
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true })
 
       if (peersError) throw peersError
 
       if (peersData && peersData.length > 0) {
-        // Flatten the nested profile data into the peer object
-        const peersWithAvatars = peersData.map((peer: any) => ({
-          id: peer.id,
-          room_id: peer.room_id,
-          user_id: peer.user_id,
-          username: peer.username,
-          joined_at: peer.joined_at,
-          last_seen: peer.last_seen,
-          avatar_url: peer.profiles?.avatar_url || null,
+        // Get unique user IDs from peers
+        const userIds = [...new Set(peersData.map((peer) => peer.user_id))]
+
+        // Fetch profiles for these users
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, avatar_url")
+          .in("id", userIds)
+
+        if (profilesError) {
+          console.error("Error fetching profiles:", profilesError)
+        }
+
+        // Create a map of user_id to avatar_url
+        const avatarMap = new Map(profilesData?.map((profile) => [profile.id, profile.avatar_url]) || [])
+
+        // Merge avatar_url into peer objects
+        const peersWithAvatars = peersData.map((peer) => ({
+          ...peer,
+          avatar_url: avatarMap.get(peer.user_id) || null,
         }))
 
         setPeers(peersWithAvatars)
