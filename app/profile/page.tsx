@@ -11,21 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import {
-  User,
-  Mail,
-  LinkIcon,
-  Trash2,
-  Shield,
-  Github,
-  CheckCircle2,
-  Upload,
-  Palette,
-  Loader2,
-  Check,
-} from "lucide-react"
+import { User, Mail, LinkIcon, Trash2, Shield, Github, CheckCircle2, Upload, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { cn } from "@/lib/utils"
 
 const PREMADE_AVATARS = [
   "bg-gradient-to-br from-blue-500 to-purple-600",
@@ -157,20 +144,6 @@ export default function ProfilePage() {
     }
   }
 
-  const handleSelectPremade = async (gradientClass: string) => {
-    setIsUploading(true)
-    setMessage(null)
-
-    try {
-      await updateAvatarUrl(gradientClass)
-      setMessage({ type: "success", text: "Avatar updated successfully!" })
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Failed to select avatar" })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
   const updateAvatarUrl = async (newUrl: string) => {
     if (!user) return
     const { error } = await supabase.from("profiles").update({ avatar_url: newUrl }).eq("id", user.id)
@@ -237,7 +210,6 @@ export default function ProfilePage() {
 
   if (!user) return null
 
-  const isPremadeAvatar = profile?.avatar_url?.startsWith("bg-")
   const currentAvatar = profile?.avatar_url
 
   return (
@@ -278,21 +250,14 @@ export default function ProfilePage() {
                 <User className="w-5 h-5 text-primary" />
                 Profile Picture
               </CardTitle>
-              <CardDescription>Choose a gradient avatar or upload your own image</CardDescription>
+              <CardDescription>Upload your own profile picture</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Current Avatar Preview */}
               <div className="flex flex-col items-center gap-4 p-6 rounded-lg bg-muted/20 border border-border/50">
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  {!isPremadeAvatar && (
-                    <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
-                  )}
-                  <AvatarFallback
-                    className={cn(
-                      "text-3xl font-semibold text-white",
-                      isPremadeAvatar ? currentAvatar : "bg-gradient-to-br from-primary to-accent",
-                    )}
-                  >
+                  <AvatarImage src={currentAvatar || "/placeholder.svg"} alt={username || user.email} />
+                  <AvatarFallback className="text-3xl font-semibold text-white bg-gradient-to-br from-primary to-accent">
                     {getInitials(username, user.email)}
                   </AvatarFallback>
                 </Avatar>
@@ -301,46 +266,11 @@ export default function ProfilePage() {
 
               <Separator />
 
-              {/* Premade Avatars */}
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2 text-base">
-                  <Palette className="w-4 h-4" />
-                  Gradient Avatars
-                </Label>
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                  {PREMADE_AVATARS.map((gradient) => {
-                    const isSelected = currentAvatar === gradient
-                    return (
-                      <button
-                        key={gradient}
-                        type="button"
-                        onClick={() => handleSelectPremade(gradient)}
-                        disabled={isUploading}
-                        className={cn(
-                          "relative h-14 w-14 rounded-full transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed",
-                          gradient,
-                          isSelected && "ring-4 ring-primary ring-offset-2 ring-offset-background scale-110",
-                        )}
-                        aria-label={`Select gradient avatar ${gradient}`}
-                      >
-                        {isSelected && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Check className="w-6 h-6 text-white drop-shadow-lg" />
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <Separator />
-
               {/* Upload Custom Avatar */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-base">
                   <Upload className="w-4 h-4" />
-                  Upload Custom Image
+                  Upload Profile Picture
                 </Label>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button

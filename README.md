@@ -9,7 +9,7 @@ WebDrop is a high-speed, secure, peer-to-peer file transfer application. It uses
 * **Real-time Presence:** See who is online in your room with live status updates (Connecting, Live, Offline) powered by Supabase Presence.
 * **User Authentication:** Secure sign-up and login with Email or GitHub.
 * **Profile Management:** Users can update their username and profile picture.
-* **Custom Avatars:** Choose from pre-made gradient avatars or upload your own, with client-side resizing for speed and efficiency.
+* **Custom Avatars:** Upload your own profile picture with client-side resizing for speed and efficiency.
 * **Robust Error Handling:** Gracefully handles page refreshes and browser disconnects.
 
 ## 💻 Tech Stack

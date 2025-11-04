@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Users, Zap, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
 import type { Peer } from "@/lib/types/database"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { cn } from "@/lib/utils"
 
 interface PeerListProps {
   peers: Peer[]
@@ -15,13 +14,7 @@ interface PeerListProps {
   onlineUserIds: Set<string>
 }
 
-export default function PeerList({
-  peers,
-  onRefresh,
-  connectionStates,
-  currentUserId,
-  onlineUserIds,
-}: PeerListProps) {
+export default function PeerList({ peers, onRefresh, connectionStates, currentUserId, onlineUserIds }: PeerListProps) {
   const otherPeers = peers.filter((p) => p.user_id !== currentUserId)
 
   // Helper function to get initials
@@ -99,8 +92,6 @@ export default function PeerList({
             const state = isOnline ? connectionStates.get(peer.user_id) || "connecting" : "offline"
             const status = getStatusVisuals(state)
 
-            const isPremadeAvatar = peer.avatar_url?.startsWith("bg-")
-
             return (
               <div
                 key={peer.id}
@@ -108,15 +99,8 @@ export default function PeerList({
               >
                 <div className="flex items-center gap-4">
                   <Avatar className="h-10 w-10">
-                    {!isPremadeAvatar && (
-                      <AvatarImage src={peer.avatar_url || "/placeholder.svg"} alt={peer.username} />
-                    )}
-                    <AvatarFallback
-                      className={cn(
-                        "bg-gradient-to-br from-primary to-accent text-white font-semibold",
-                        isPremadeAvatar && peer.avatar_url,
-                      )}
-                    >
+                    <AvatarImage src={peer.avatar_url || "/placeholder.svg"} alt={peer.username} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
                       {getInitials(peer.username)}
                     </AvatarFallback>
                   </Avatar>
