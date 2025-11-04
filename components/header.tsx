@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { cn } from "@/lib/utils" // Import cn
 
 export default function Header() {
   const [isDark, setIsDark] = useState(false)
@@ -90,6 +91,8 @@ export default function Header() {
     return "U"
   }
 
+  const isPremadeAvatar = profile?.avatar_url?.startsWith("bg-")
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 backdrop-blur-xl bg-background/80">
       <div className="container mx-auto px-4 lg:px-8 py-4 lg:py-5">
@@ -119,11 +122,18 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-10 w-10 border-2 border-primary/20">
-                      <AvatarImage
-                        src={profile?.avatar_url || "/placeholder.svg"}
-                        alt={profile?.username || user.email}
-                      />
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
+                      {!isPremadeAvatar && (
+                        <AvatarImage
+                          src={profile?.avatar_url || "/placeholder.svg"}
+                          alt={profile?.username || user.email}
+                        />
+                      )}
+                      <AvatarFallback
+                        className={cn(
+                          "bg-gradient-to-br from-primary to-accent text-white font-semibold",
+                          isPremadeAvatar && profile.avatar_url,
+                        )}
+                      >
                         {getInitials(profile?.username, user.email)}
                       </AvatarFallback>
                     </Avatar>
