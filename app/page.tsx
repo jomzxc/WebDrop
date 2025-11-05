@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Shield, Zap, Users, Infinity, ArrowRight, Github } from "lucide-react"
+import { Shield, Zap, Users, Infinity as InfinityIcon, ArrowRight, Github } from "lucide-react"
 import Link from "next/link"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
@@ -135,7 +135,7 @@ export default function LandingPage() {
               <Card className="backdrop-blur-xl border-border/50 bg-card/40 hover:bg-card/60 transition-all">
                 <CardContent className="pt-8 space-y-4">
                   <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Infinity className="w-7 h-7 text-accent" />
+                    <InfinityIcon className="w-7 h-7 text-accent" />
                   </div>
                   <h3 className="text-xl font-semibold">Unlimited Transfers</h3>
                   <p className="text-muted-foreground leading-relaxed">
