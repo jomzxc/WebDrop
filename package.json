@@ -6,7 +6,10 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -63,7 +66,9 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.45.3",
     "@tailwindcss/postcss": "^4.1.9",
+    "@testmail.app/graphql-request": "^1.8.4",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
