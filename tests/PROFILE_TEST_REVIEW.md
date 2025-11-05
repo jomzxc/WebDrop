@@ -131,7 +131,8 @@ These scenarios are either:
 ### Fixtures:
 - ✅ **File:** `tests/fixtures/test-avatar.png`
 - ✅ **Exists:** Yes
-- ✅ **Format:** JPEG image data (note: file extension is `.png` but actual format is JPEG - this is acceptable for testing)
+- ✅ **Format:** JPEG image data (verified via `file` command: "JPEG image data, JFIF standard 1.01")
+  - Note: File has `.png` extension but actual format is JPEG - this is acceptable for testing
 - ✅ **Size:** 115KB
 - ✅ **Dimensions:** 1057x1057 pixels
 - ✅ **Path:** Uses `path.join(__dirname, 'fixtures/test-avatar.png')` (correct)
@@ -296,7 +297,7 @@ import { randomUUID } from 'crypto';
 test.describe('Profile Management', () => {
 
   const testAvatarPath = path.join(__dirname, 'fixtures/test-avatar.png');
-  const newUsername = `TestUser-${randomUUID().split('-')[0]}`; // Note: Generated once per module load
+  const newUsername = `TestUser-${randomUUID().split('-')[0]}`; // Note: Generated when module loads (once per test session)
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/profile');
