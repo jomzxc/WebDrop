@@ -59,15 +59,20 @@ To run this project, you will need a Supabase project.
     cd [YOUR_REPO]
     \`\`\`
 
-2.  Install dependencies (using `pnpm` as defined in your lockfile):
+2.  Install dependencies:
     \`\`\`bash
-    pnpm install
+    npm install --legacy-peer-deps
+    # or if you have pnpm installed:
+    # pnpm install
     \`\`\`
 
 3.  Set up environment variables:
     * Find your Supabase Project URL and Anon Key in **Project Settings** -> **API**.
-    * Create a new file named `.env.local` in the root of the project.
-    * Add your keys to it:
+    * Copy the example environment file:
+        \`\`\`bash
+        cp .env.example .env.local
+        \`\`\`
+    * Edit `.env.local` and add your keys:
         \`\`\`
         NEXT_PUBLIC_SUPABASE_URL=https://[YOUR-PROJECT-REF].supabase.co
         NEXT_PUBLIC_SUPABASE_ANON_KEY=[YOUR-ANON-KEY]
@@ -75,10 +80,13 @@ To run this project, you will need a Supabase project.
 
 4.  Run the development server:
     \`\`\`bash
-    pnpm dev
+    npm run dev
+    # or: pnpm dev
     \`\`\`
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the running application.
+
+**Note:** The project can be built without environment variables (for CI/CD), but you'll need valid Supabase credentials for the app to function properly at runtime.
 
 ---
 
