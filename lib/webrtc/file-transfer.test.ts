@@ -54,7 +54,7 @@ describe('FileTransferManager', () => {
       const chunk: FileChunk = {
         id: 'chunked-file',
         index: 0,
-        data: new Uint8Array([1, 2, 3, 4]).buffer as any,
+        data: new Uint8Array([1, 2, 3, 4]).buffer,
         total: 2
       }
 
@@ -80,7 +80,7 @@ describe('FileTransferManager', () => {
         const chunk: FileChunk = {
           id: 'multi-chunk',
           index: i,
-          data: new Uint8Array([i, i+1, i+2]).buffer as any,
+          data: new Uint8Array([i, i+1, i+2]).buffer,
           total: 4
         }
         manager.receiveChunk(chunk, mockProgress)
@@ -107,9 +107,9 @@ describe('FileTransferManager', () => {
       
       // Receive chunks in wrong order: 1, 0, 2
       const chunks = [
-        { id: 'unordered', index: 1, data: new Uint8Array([2]).buffer as any, total: 3 },
-        { id: 'unordered', index: 0, data: new Uint8Array([1]).buffer as any, total: 3 },
-        { id: 'unordered', index: 2, data: new Uint8Array([3]).buffer as any, total: 3 },
+        { id: 'unordered', index: 1, data: new Uint8Array([2]).buffer, total: 3 },
+        { id: 'unordered', index: 0, data: new Uint8Array([1]).buffer, total: 3 },
+        { id: 'unordered', index: 2, data: new Uint8Array([3]).buffer, total: 3 },
       ]
 
       chunks.forEach(chunk => manager.receiveChunk(chunk, mockProgress))
@@ -123,7 +123,7 @@ describe('FileTransferManager', () => {
       const chunk: FileChunk = {
         id: 'unknown-file',
         index: 0,
-        data: new Uint8Array([1, 2, 3]).buffer as any,
+        data: new Uint8Array([1, 2, 3]).buffer,
         total: 1
       }
 
@@ -150,8 +150,8 @@ describe('FileTransferManager', () => {
       
       // Receive two chunks
       const chunks = [
-        { id: 'complete-test', index: 0, data: new Uint8Array([72, 101, 108, 108, 111]).buffer as any, total: 2 }, // "Hello"
-        { id: 'complete-test', index: 1, data: new Uint8Array([32, 87, 111, 114, 108, 100]).buffer as any, total: 2 }, // " World"
+        { id: 'complete-test', index: 0, data: new Uint8Array([72, 101, 108, 108, 111]).buffer, total: 2 }, // "Hello"
+        { id: 'complete-test', index: 1, data: new Uint8Array([32, 87, 111, 114, 108, 100]).buffer, total: 2 }, // " World"
       ]
 
       chunks.forEach(chunk => manager.receiveChunk(chunk, mockProgress))
