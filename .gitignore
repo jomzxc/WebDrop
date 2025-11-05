@@ -30,3 +30,7 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /playwright/.auth/
+
+# Vitest
+coverage/
+.vitest/
