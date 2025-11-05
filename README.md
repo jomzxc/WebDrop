@@ -27,14 +27,14 @@ WebDrop is built as a modern, serverless web application using Next.js and Supab
 
 | Component | Technology |
 |-----------|------------|
-| **Framework** | Next.js 14 (App Router) |
+| **Framework** | Next.js 16 (App Router) |
 | **Language** | TypeScript |
 | **Authentication** | Supabase Auth (Email + GitHub OAuth) |
 | **Database** | Supabase Postgres |
 | **Real-Time** | Supabase Realtime (Presence & Broadcast) |
 | **Storage** | Supabase Storage (Avatar uploads) |
 | **P2P Transfer** | WebRTC (RTCPeerConnection, RTCDataChannel) |
-| **UI Framework** | React 19 |
+| **UI Framework** | React 19.2 |
 | **Styling** | Tailwind CSS 4 + shadcn/ui components |
 | **Icons** | Lucide React |
 | **Package Manager** | npm / pnpm |

@@ -97,9 +97,9 @@ WebDrop/
 
 ### Key Technologies to Understand
 
-- **Next.js 14 (App Router)** – Server and client components, routing, API routes
+- **Next.js 16 (App Router)** – Server and client components, routing, API routes
 - **TypeScript** – Type-safe JavaScript
-- **React 19** – Component architecture, hooks, and state management
+- **React 19.2** – Component architecture, hooks, and state management
 - **Supabase** – Authentication, database, real-time subscriptions, storage
 - **WebRTC** – Peer-to-peer connections, data channels, signaling
 - **Tailwind CSS** – Utility-first styling
