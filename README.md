@@ -32,11 +32,14 @@ To run this project, you will need a Supabase project.
 1.  Go to [Supabase.com](https://supabase.com) and create a new project.
 2.  Go to the **SQL Editor** (`<>` icon).
 3.  Copy the contents of the following files from the `/scripts` directory and run them **in this order**:
-    1.  `001_create_tables.sql` (Creates `profiles`, `rooms`, `peers`, `file_transfers`)
-    2.  `002_profile_trigger.sql` (Auto-creates a user profile on sign-up)
-    3.  `003_update_timestamp_trigger.sql` (Auto-updates `updated_at` on profiles)
-    4.  `005_enable_realtime.sql` (Enables realtime updates for `rooms` and `peers`)
-    5.  `006_avatar_storage.sql` (Creates the secure `avatars` storage bucket)
+    1.  [001_create_tables.sql](scripts/001_create_tables.sql)
+    2.  [002_create_policies.sql](scripts/002_create_policies.sql)
+    3.  [003_handle_new_user_trigger.sql](scripts/003_handle_new_user_trigger.sql)
+    4.  [004_handle_updated_at_trigger.sql](scripts/004_handle_updated_at_trigger.sql)
+    5.  [005_add_peers_profile_fkey.sql](scripts/005_add_peers_profile_fkey.sql)
+    6.  [006_enable_realtime.sql](scripts/006_enable_realtime.sql)
+    7.  [007_avatar_storage.sql](scripts/007_avatar_storage.sql)
+    8.  [008_sync_username_trigger.sql](scripts/008_sync_username_trigger.sql)
 
 4.  **Enable GitHub Auth:**
     * Go to **Authentication** -> **Providers**.
