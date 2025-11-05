@@ -190,6 +190,17 @@ Tests are automatically run in GitHub Actions on:
   - Authentication flows
   - Data validation
 
+### Coverage Exclusions
+
+The following are intentionally excluded from coverage metrics:
+
+- **`components/ui/**`**: These are third-party shadcn/ui components that come pre-tested from the shadcn/ui library. Testing these would duplicate the library's own test suite and provide minimal value.
+- **`tests/**`**: Test files themselves are excluded
+- **`*.config.{ts,js}`**: Configuration files
+- **`.next/`**: Next.js build artifacts
+- **`playwright/`**: Playwright-specific files
+- **`node_modules/`**: Third-party dependencies
+
 ## Test Best Practices
 
 1. **Isolation**: Each test should be independent
