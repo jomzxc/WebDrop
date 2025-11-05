@@ -113,7 +113,7 @@ Navigate to the **SQL Editor** in your Supabase dashboard and run the scripts in
 #### Clone the Repository
 
 ```bash
-git clone https://github.com/jomzxc/WebDrop.git
+git clone https://github.com/YOUR-USERNAME/WebDrop.git
 cd WebDrop
 ```
 
@@ -259,7 +259,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## 🔗 Links
 
-- **Live Demo:** Coming soon
 - **GitHub:** [github.com/jomzxc/WebDrop](https://github.com/jomzxc/WebDrop)
 - **Issues:** [github.com/jomzxc/WebDrop/issues](https://github.com/jomzxc/WebDrop/issues)
 

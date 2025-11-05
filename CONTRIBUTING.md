@@ -172,11 +172,13 @@ export function MyComponent({ title, onSubmit }: MyComponentProps) {
 
 ### Formatting
 
-While the project doesn't currently enforce a formatter:
+While the project doesn't currently use automated formatting tools like Prettier:
 - Use **2 spaces** for indentation
 - Use **double quotes** for strings
 - Use **semicolons** at the end of statements
 - Keep lines under **120 characters** when possible
+
+> **Note:** Contributors are welcome to propose adding Prettier or ESLint with autofix as a future enhancement to automate code formatting.
 
 ---
 
