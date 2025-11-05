@@ -131,7 +131,7 @@ These scenarios are either:
 ### Fixtures:
 - ✅ **File:** `tests/fixtures/test-avatar.png`
 - ✅ **Exists:** Yes
-- ✅ **Format:** JPEG image (valid)
+- ✅ **Format:** JPEG image data (note: file extension is `.png` but actual format is JPEG - this is acceptable for testing)
 - ✅ **Size:** 115KB
 - ✅ **Dimensions:** 1057x1057 pixels
 - ✅ **Path:** Uses `path.join(__dirname, 'fixtures/test-avatar.png')` (correct)
@@ -221,6 +221,37 @@ All aspects verified:
 
 ---
 
+## Potential Future Improvements (Optional)
+
+While the current tests are functional and meet the requirements, the following non-critical improvements could be considered in future maintenance:
+
+### 1. Username Generation Timing
+**Current Approach:**
+```typescript
+const newUsername = `TestUser-${randomUUID().split('-')[0]}`;
+```
+
+**Observation:**  
+The username is generated once at module load time and reused across all test runs. While this works for the current test suite (tests don't conflict), generating the username inside each test or in `beforeEach` would provide better isolation for parallel execution or repeated runs.
+
+**Suggested Improvement (optional):**
+```typescript
+test('should update username', async ({ page }) => {
+  const newUsername = `TestUser-${randomUUID().split('-')[0]}`;
+  // ... rest of test
+});
+```
+
+**Priority:** Low - Current approach works fine for the existing suite
+
+### 2. File Format Documentation
+**Observation:**  
+The test fixture file is named `test-avatar.png` but is actually JPEG format (verified with `file` command). This doesn't affect test functionality but could be noted.
+
+**Priority:** Very Low - Does not impact test execution
+
+---
+
 ## Decision Matrix
 
 | Aspect | Assessment | Rationale |
@@ -255,6 +286,8 @@ The test suite successfully balances comprehensive coverage of critical function
 
 ## Appendix: Test Code Reference
 
+Current implementation (as reviewed):
+
 ```typescript
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -263,7 +296,7 @@ import { randomUUID } from 'crypto';
 test.describe('Profile Management', () => {
 
   const testAvatarPath = path.join(__dirname, 'fixtures/test-avatar.png');
-  const newUsername = `TestUser-${randomUUID().split('-')[0]}`;
+  const newUsername = `TestUser-${randomUUID().split('-')[0]}`; // Note: Generated once per module load
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/profile');
@@ -291,6 +324,10 @@ test.describe('Profile Management', () => {
   });
 });
 ```
+
+**Note:** While the username generation at module level works for the current suite, 
+generating it per-test would provide better isolation. This is noted in the 
+"Potential Future Improvements" section above but is not required for the current review.
 
 ---
 
