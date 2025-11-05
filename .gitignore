@@ -30,3 +30,6 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /playwright/.auth/
+
+# Test coverage
+/coverage/

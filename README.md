@@ -82,6 +82,31 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the r
 
 ---
 
+## 🧪 Testing
+
+WebDrop has comprehensive test coverage including unit tests and end-to-end tests.
+
+### Running Tests
+
+```bash
+# Run unit tests
+pnpm test
+
+# Run E2E tests (requires build first)
+pnpm build
+pnpm test:e2e
+
+# Run all tests
+pnpm test:all
+
+# Generate coverage report
+pnpm test:coverage
+```
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
+
+---
+
 ## ⚠️ File Size Limit
 
 This application is designed to chunk files and send them peer-to-peer. The file chunks are re-assembled in the **receiver's browser memory (RAM)**.
