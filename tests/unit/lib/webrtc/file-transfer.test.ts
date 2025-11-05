@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { FileTransferManager, type FileMetadata, type FileChunk } from '@/lib/webrtc/file-transfer'
 
+// Test constants
+const NONEXISTENT_FILE_ID = 'nonexistent'
+
+// Helper to convert string to ArrayBuffer for testing
+function stringToArrayBuffer(str: string): ArrayBuffer {
+  const encoder = new TextEncoder()
+  return encoder.encode(str).buffer
+}
+
 describe('FileTransferManager', () => {
   let manager: FileTransferManager
 
@@ -102,7 +111,7 @@ describe('FileTransferManager', () => {
       const chunk: FileChunk = {
         id: 'file123',
         index: 0,
-        data: new Uint8Array([72, 101, 108, 108, 111]).buffer,
+        data: stringToArrayBuffer('Hello'),
         total: 2,
       }
 
@@ -114,7 +123,7 @@ describe('FileTransferManager', () => {
     it('should handle chunk without metadata gracefully', () => {
       const onProgress = vi.fn()
       const chunk: FileChunk = {
-        id: 'nonexistent',
+        id: NONEXISTENT_FILE_ID,
         index: 0,
         data: new ArrayBuffer(10),
         total: 1,
@@ -141,13 +150,13 @@ describe('FileTransferManager', () => {
       const chunk1: FileChunk = {
         id: 'file123',
         index: 0,
-        data: new Uint8Array([72, 101, 108, 108, 111]).buffer,
+        data: stringToArrayBuffer('Hello'),
         total: 2,
       }
       const chunk2: FileChunk = {
         id: 'file123',
         index: 1,
-        data: new Uint8Array([32, 87, 111, 114, 108, 100]).buffer,
+        data: stringToArrayBuffer(' World'),
         total: 2,
       }
 
@@ -165,7 +174,7 @@ describe('FileTransferManager', () => {
     })
 
     it('should return null for nonexistent transfer', () => {
-      const blob = manager.completeTransfer('nonexistent')
+      const blob = manager.completeTransfer(NONEXISTENT_FILE_ID)
       expect(blob).toBeNull()
     })
   })
