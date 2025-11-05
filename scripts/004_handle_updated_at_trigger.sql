@@ -11,8 +11,9 @@ $$;
 
 -- Trigger for profiles table
 drop trigger if exists on_profile_updated on public.profiles;
+drop trigger if exists on_profile_updated_timestamp on public.profiles;
 
-create trigger on_profile_updated
+create trigger on_profile_updated_timestamp
   before update on public.profiles
   for each row
   execute function public.handle_updated_at();
