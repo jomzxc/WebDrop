@@ -7,7 +7,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://webdrop.vercel.app'),
+  metadataBase: new URL('https://webdrop.jomszxc.tech'),
   title: {
     default: "WebDrop - Secure P2P File Transfer",
     template: "%s | WebDrop",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://webdrop.vercel.app",
+    url: "https://webdrop.jomszxc.tech",
     siteName: "WebDrop",
     title: "WebDrop - Secure P2P File Transfer",
     description:
@@ -87,7 +87,7 @@ export const metadata: Metadata = {
   //   yandex: "your-yandex-verification-code",
   // },
   alternates: {
-    canonical: "https://webdrop.vercel.app",
+    canonical: "https://webdrop.jomszxc.tech",
   },
   category: "technology",
 }
