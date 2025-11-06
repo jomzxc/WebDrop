@@ -1,0 +1,10 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow authentication and API routes
+Disallow: /auth/
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://webdrop.jomszxc.tech/sitemap.xml

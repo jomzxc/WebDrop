@@ -39,8 +39,71 @@ export default function LandingPage() {
     )
   }
 
+  // JSON-LD structured data for SEO
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://webdrop.jomszxc.tech/#website",
+        url: "https://webdrop.jomszxc.tech",
+        name: "WebDrop",
+        description: "Fast, secure file sharing through direct peer-to-peer connections",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: "https://webdrop.jomszxc.tech/?search={search_term_string}",
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://webdrop.jomszxc.tech/#webapplication",
+        name: "WebDrop",
+        url: "https://webdrop.jomszxc.tech",
+        description:
+          "Fast, secure file sharing through direct peer-to-peer connections. No servers, no limits, just direct transfers.",
+        applicationCategory: "UtilityApplication",
+        operatingSystem: "Any",
+        browserRequirements: "Requires JavaScript. Requires HTML5.",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+        featureList: [
+          "End-to-End Encrypted",
+          "Lightning Fast",
+          "Real-Time Collaboration",
+          "Unlimited Transfers",
+          "No file storage on servers",
+          "Direct peer-to-peer connections",
+        ],
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://webdrop.jomszxc.tech/#organization",
+        name: "WebDrop",
+        url: "https://webdrop.jomszxc.tech",
+        logo: {
+          "@type": "ImageObject",
+          url: "https://webdrop.jomszxc.tech/icon-512.png",
+        },
+        sameAs: ["https://github.com/jomzxc/WebDrop"],
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
