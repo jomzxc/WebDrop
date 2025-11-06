@@ -375,12 +375,10 @@ export default function RoomPage() {
         return
       }
 
-      const connectionState = connection.getConnectionState()
-
-      if (connectionState !== "connected") {
+      if (!connection.isFullyConnected()) {
         toast({
           title: "Connection not ready",
-          description: `Connection state: ${connectionState}. Please wait...`,
+          description: "Please wait for the connection to fully establish",
           variant: "destructive",
         })
         return

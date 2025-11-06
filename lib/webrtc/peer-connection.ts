@@ -95,6 +95,11 @@ export class PeerConnection {
     this.dataChannel.onclose = () => {
       this.onStateChangeCallback?.("closed")
     }
+    
+    // If data channel is already open when we setup (can happen in race conditions)
+    if (this.dataChannel.readyState === "open" && this.pc.connectionState === "connected") {
+      this.onStateChangeCallback?.("connected")
+    }
   }
 
   async createOffer() {
@@ -196,5 +201,9 @@ export class PeerConnection {
 
   getConnectionState(): RTCPeerConnectionState {
     return this.pc.connectionState
+  }
+
+  isFullyConnected(): boolean {
+    return this.pc.connectionState === "connected" && this.dataChannel?.readyState === "open"
   }
 }
