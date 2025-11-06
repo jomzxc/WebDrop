@@ -33,8 +33,13 @@ export class PeerConnection {
       const state = this.pc.connectionState
       
       // Only report connected if both peer connection and data channel are ready
-      if (state === "connected" && this.isFullyConnected()) {
-        this.onStateChangeCallback?.("connected")
+      if (state === "connected") {
+        if (this.isFullyConnected()) {
+          this.onStateChangeCallback?.("connected")
+        } else {
+          // Peer connection is ready but data channel isn't open yet
+          this.onStateChangeCallback?.("connecting")
+        }
       } else if (state === "connecting" || state === "new") {
         this.onStateChangeCallback?.("connecting")
       } else if (state === "failed" || state === "disconnected" || state === "closed") {
