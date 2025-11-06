@@ -53,7 +53,7 @@ export default function LandingPage() {
           "@type": "SearchAction",
           target: {
             "@type": "EntryPoint",
-            urlTemplate: "https://webdrop.vercel.app/room?q={search_term_string}",
+            urlTemplate: "https://webdrop.vercel.app/?search={search_term_string}",
           },
           "query-input": "required name=search_term_string",
         },

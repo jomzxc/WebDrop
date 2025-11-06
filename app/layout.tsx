@@ -49,10 +49,11 @@ export const metadata: Metadata = {
       "Fast, secure file sharing through direct peer-to-peer connections. No servers, no limits, just direct transfers.",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.svg",
         width: 1200,
         height: 630,
         alt: "WebDrop - Secure P2P File Transfer",
+        type: "image/svg+xml",
       },
     ],
   },
@@ -61,7 +62,7 @@ export const metadata: Metadata = {
     title: "WebDrop - Secure P2P File Transfer",
     description:
       "Fast, secure file sharing through direct peer-to-peer connections. No servers, no limits, just direct transfers.",
-    images: ["/og-image.png"],
+    images: ["/og-image.svg"],
     creator: "@webdrop",
   },
   robots: {
@@ -80,10 +81,11 @@ export const metadata: Metadata = {
     shortcut: "/icon.svg",
     apple: "/apple-icon.svg",
   },
-  verification: {
-    google: "google-site-verification-code",
-    yandex: "yandex-verification-code",
-  },
+  // Note: Add verification codes after setting up Google Search Console and Yandex Webmaster
+  // verification: {
+  //   google: "your-google-site-verification-code",
+  //   yandex: "your-yandex-verification-code",
+  // },
   alternates: {
     canonical: "https://webdrop.vercel.app",
   },
