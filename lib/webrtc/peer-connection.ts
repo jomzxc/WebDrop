@@ -31,7 +31,15 @@ export class PeerConnection {
 
     this.pc.onconnectionstatechange = () => {
       const state = this.pc.connectionState
-      this.onStateChangeCallback?.(state)
+      
+      // Only report connected if data channel is also open
+      if (state === "connected" && this.dataChannel && this.dataChannel.readyState === "open") {
+        this.onStateChangeCallback?.("connected")
+      } else if (state === "connecting") {
+        this.onStateChangeCallback?.("connecting")
+      } else if (state === "failed" || state === "disconnected" || state === "closed") {
+        this.onStateChangeCallback?.(state)
+      }
 
       if (state === "failed" || state === "disconnected") {
         this.onErrorCallback?.(new Error(`Connection ${state}`))
@@ -65,7 +73,10 @@ export class PeerConnection {
     if (!this.dataChannel) return
 
     this.dataChannel.onopen = () => {
-      this.onStateChangeCallback?.("connected")
+      // Check if peer connection is also connected
+      if (this.pc.connectionState === "connected") {
+        this.onStateChangeCallback?.("connected")
+      }
     }
 
     this.dataChannel.onmessage = (event) => {
