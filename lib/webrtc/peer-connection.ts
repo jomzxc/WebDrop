@@ -31,7 +31,20 @@ export class PeerConnection {
 
     this.pc.onconnectionstatechange = () => {
       const state = this.pc.connectionState
-      this.onStateChangeCallback?.(state)
+      
+      // Only report connected if both peer connection and data channel are ready
+      if (state === "connected") {
+        if (this.isFullyConnected()) {
+          this.onStateChangeCallback?.("connected")
+        } else {
+          // Peer connection is ready but data channel isn't open yet
+          this.onStateChangeCallback?.("connecting")
+        }
+      } else if (state === "connecting" || state === "new") {
+        this.onStateChangeCallback?.("connecting")
+      } else if (state === "failed" || state === "disconnected" || state === "closed") {
+        this.onStateChangeCallback?.(state)
+      }
 
       if (state === "failed" || state === "disconnected") {
         this.onErrorCallback?.(new Error(`Connection ${state}`))
@@ -65,7 +78,10 @@ export class PeerConnection {
     if (!this.dataChannel) return
 
     this.dataChannel.onopen = () => {
-      this.onStateChangeCallback?.("connected")
+      // Check if both peer connection and data channel are ready
+      if (this.isFullyConnected()) {
+        this.onStateChangeCallback?.("connected")
+      }
     }
 
     this.dataChannel.onmessage = (event) => {
@@ -83,6 +99,11 @@ export class PeerConnection {
 
     this.dataChannel.onclose = () => {
       this.onStateChangeCallback?.("closed")
+    }
+    
+    // If data channel is already open when we setup (can happen in race conditions)
+    if (this.isFullyConnected()) {
+      this.onStateChangeCallback?.("connected")
     }
   }
 
@@ -185,5 +206,9 @@ export class PeerConnection {
 
   getConnectionState(): RTCPeerConnectionState {
     return this.pc.connectionState
+  }
+
+  isFullyConnected(): boolean {
+    return this.pc.connectionState === "connected" && this.dataChannel?.readyState === "open"
   }
 }
