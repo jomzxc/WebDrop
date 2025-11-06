@@ -35,7 +35,7 @@ export class PeerConnection {
       // Only report connected if data channel is also open
       if (state === "connected" && this.dataChannel && this.dataChannel.readyState === "open") {
         this.onStateChangeCallback?.("connected")
-      } else if (state === "connecting") {
+      } else if (state === "connecting" || state === "new") {
         this.onStateChangeCallback?.("connecting")
       } else if (state === "failed" || state === "disconnected" || state === "closed") {
         this.onStateChangeCallback?.(state)
@@ -97,7 +97,7 @@ export class PeerConnection {
     }
     
     // If data channel is already open when we setup (can happen in race conditions)
-    if (this.dataChannel.readyState === "open" && this.pc.connectionState === "connected") {
+    if (this.isFullyConnected()) {
       this.onStateChangeCallback?.("connected")
     }
   }
