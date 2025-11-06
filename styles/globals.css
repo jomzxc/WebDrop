@@ -122,4 +122,53 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Dynamic cursor styles for interactive elements */
+  button,
+  a,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  select,
+  label:has(input[type="checkbox"]),
+  label:has(input[type="radio"]),
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"]::file-selector-button {
+    @apply cursor-pointer;
+  }
+  
+  button:disabled,
+  a[aria-disabled="true"],
+  [role="button"][aria-disabled="true"],
+  [type="button"]:disabled,
+  [type="submit"]:disabled,
+  [type="reset"]:disabled,
+  select:disabled,
+  input:disabled {
+    @apply cursor-not-allowed;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  textarea {
+    @apply cursor-text;
+  }
+  
+  input[type="text"]:disabled,
+  input[type="email"]:disabled,
+  input[type="password"]:disabled,
+  input[type="search"]:disabled,
+  input[type="tel"]:disabled,
+  input[type="url"]:disabled,
+  input[type="number"]:disabled,
+  textarea:disabled {
+    @apply cursor-not-allowed;
+  }
 }
