@@ -20,7 +20,10 @@ END;
 $$;
 
 -- Create the trigger that fires the function
-CREATE TRIGGER on_profile_updated
+DROP TRIGGER IF EXISTS on_profile_updated ON public.profiles;
+DROP TRIGGER IF EXISTS on_profile_username_synced ON public.profiles;
+
+CREATE TRIGGER on_profile_username_synced
   AFTER UPDATE OF username ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_profile_update();

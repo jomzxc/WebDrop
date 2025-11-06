@@ -74,7 +74,7 @@ export default function LandingPage() {
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
               <Button size="lg" variant="outline" asChild className="text-lg px-8 py-6 bg-transparent">
-                <Link href="https://github.com" target="_blank" rel="noopener noreferrer">
+                <Link href="https://github.com/jomzxc/WebDrop" target="_blank" rel="noopener noreferrer">
                   <Github className="mr-2 w-5 h-5" />
                   View on GitHub
                 </Link>
