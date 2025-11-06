@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://webdrop.vercel.app'
+  const baseUrl = 'https://webdrop.jomszxc.tech'
   
   return [
     {

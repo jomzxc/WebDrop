@@ -7,4 +7,4 @@ Disallow: /auth/
 Disallow: /api/
 
 # Sitemap location
-Sitemap: https://webdrop.vercel.app/sitemap.xml
+Sitemap: https://webdrop.jomszxc.tech/sitemap.xml

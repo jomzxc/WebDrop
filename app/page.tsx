@@ -45,24 +45,24 @@ export default function LandingPage() {
     "@graph": [
       {
         "@type": "WebSite",
-        "@id": "https://webdrop.vercel.app/#website",
-        url: "https://webdrop.vercel.app",
+        "@id": "https://webdrop.jomszxc.tech/#website",
+        url: "https://webdrop.jomszxc.tech",
         name: "WebDrop",
         description: "Fast, secure file sharing through direct peer-to-peer connections",
         potentialAction: {
           "@type": "SearchAction",
           target: {
             "@type": "EntryPoint",
-            urlTemplate: "https://webdrop.vercel.app/?search={search_term_string}",
+            urlTemplate: "https://webdrop.jomszxc.tech/?search={search_term_string}",
           },
           "query-input": "required name=search_term_string",
         },
       },
       {
         "@type": "WebApplication",
-        "@id": "https://webdrop.vercel.app/#webapplication",
+        "@id": "https://webdrop.jomszxc.tech/#webapplication",
         name: "WebDrop",
-        url: "https://webdrop.vercel.app",
+        url: "https://webdrop.jomszxc.tech",
         description:
           "Fast, secure file sharing through direct peer-to-peer connections. No servers, no limits, just direct transfers.",
         applicationCategory: "UtilityApplication",
@@ -84,12 +84,12 @@ export default function LandingPage() {
       },
       {
         "@type": "Organization",
-        "@id": "https://webdrop.vercel.app/#organization",
+        "@id": "https://webdrop.jomszxc.tech/#organization",
         name: "WebDrop",
-        url: "https://webdrop.vercel.app",
+        url: "https://webdrop.jomszxc.tech",
         logo: {
           "@type": "ImageObject",
-          url: "https://webdrop.vercel.app/icon-512.png",
+          url: "https://webdrop.jomszxc.tech/icon-512.png",
         },
         sameAs: ["https://github.com/jomzxc/WebDrop"],
       },
