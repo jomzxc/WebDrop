@@ -53,7 +53,13 @@ export class FileTransferManager {
     let sentChunks = 0
 
     for (let i = 0; i < totalChunks; i++) {
-      // Wait if the buffer is too full to prevent memory issues
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const chunk = file.slice(start, end)
+      const arrayBuffer = await chunk.arrayBuffer()
+
+      // Wait if the buffer is too full BEFORE sending
+      // This prevents overwhelming the data channel buffer
       if (getBufferedAmount) {
         let bufferedAmount = getBufferedAmount()
         while (bufferedAmount > MAX_BUFFERED_AMOUNT) {
@@ -62,11 +68,6 @@ export class FileTransferManager {
           bufferedAmount = getBufferedAmount()
         }
       }
-
-      const start = i * CHUNK_SIZE
-      const end = Math.min(start + CHUNK_SIZE, file.size)
-      const chunk = file.slice(start, end)
-      const arrayBuffer = await chunk.arrayBuffer()
 
       // Send ArrayBuffer directly - avoid expensive Array conversion
       sendData({
@@ -82,6 +83,12 @@ export class FileTransferManager {
 
       sentChunks++
       onProgress((sentChunks / totalChunks) * 100)
+      
+      // Add a small delay after sending to allow buffer to drain
+      // This prevents rapid successive sends from overwhelming the channel
+      if (getBufferedAmount && getBufferedAmount() > MAX_BUFFERED_AMOUNT / 2) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
     }
 
     sendData({

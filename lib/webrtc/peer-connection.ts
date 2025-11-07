@@ -206,36 +206,45 @@ export class PeerConnection {
   }
 
   sendData(data: any) {
-    if (this.dataChannel && this.dataChannel.readyState === "open") {
-      try {
-        // Handle binary data (ArrayBuffer) separately from JSON
-        if (data.type === "file-chunk" && data.chunk?.data instanceof ArrayBuffer) {
-          // Send binary data with metadata header
-          const metadata = {
-            type: data.type,
-            chunk: {
-              id: data.chunk.id,
-              index: data.chunk.index,
-              total: data.chunk.total,
-            },
-            peerId: data.peerId,
-          }
-          // Send metadata as JSON first, then binary data follows
-          this.dataChannel.send(JSON.stringify({ ...metadata, hasBinaryData: true }))
-          this.dataChannel.send(data.chunk.data)
-        } else {
-          // Regular JSON messages
-          this.dataChannel.send(JSON.stringify(data))
-        }
-      } catch (error) {
-        // Preserve the actual error message for better debugging
-        const errorMessage = error instanceof Error ? error.message : "Unknown error"
-        console.error("Failed to send data:", errorMessage, error)
-        this.onErrorCallback?.(new Error(`Failed to send data: ${errorMessage}`))
-      }
-    } else {
+    if (!this.dataChannel || this.dataChannel.readyState !== "open") {
       const state = this.dataChannel?.readyState || "null"
       this.onErrorCallback?.(new Error(`Data channel not open (state: ${state})`))
+      return
+    }
+
+    try {
+      // Handle binary data (ArrayBuffer) separately from JSON
+      if (data.type === "file-chunk" && data.chunk?.data instanceof ArrayBuffer) {
+        // Send binary data with metadata header
+        const metadata = {
+          type: data.type,
+          chunk: {
+            id: data.chunk.id,
+            index: data.chunk.index,
+            total: data.chunk.total,
+          },
+          peerId: data.peerId,
+        }
+        // Send metadata as JSON first, then binary data follows
+        const metadataStr = JSON.stringify({ ...metadata, hasBinaryData: true })
+        this.dataChannel.send(metadataStr)
+        
+        // Check if channel is still open before sending binary data
+        if (this.dataChannel.readyState === "open") {
+          this.dataChannel.send(data.chunk.data)
+        } else {
+          throw new Error(`Data channel closed after sending metadata (state: ${this.dataChannel.readyState})`)
+        }
+      } else {
+        // Regular JSON messages
+        this.dataChannel.send(JSON.stringify(data))
+      }
+    } catch (error) {
+      // Preserve the actual error message for better debugging
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      console.error("Failed to send data:", errorMessage, error)
+      this.onErrorCallback?.(new Error(`Failed to send data: ${errorMessage}`))
+      throw error // Re-throw to propagate the error up
     }
   }
 
