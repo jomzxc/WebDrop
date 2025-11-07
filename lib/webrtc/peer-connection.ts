@@ -211,9 +211,15 @@ export class PeerConnection {
     try {
       // Handle binary data (ArrayBuffer) separately from JSON
       if (data.type === "file-chunk" && data.chunk?.data instanceof ArrayBuffer) {
-        // Validate chunk data
-        if (!data.chunk.id || typeof data.chunk.index !== "number" || typeof data.chunk.total !== "number") {
-          throw new Error("Invalid chunk metadata")
+        // Validate chunk data with specific error messages
+        if (!data.chunk.id) {
+          throw new Error("Invalid chunk metadata: missing chunk id")
+        }
+        if (typeof data.chunk.index !== "number") {
+          throw new Error(`Invalid chunk metadata: index must be a number, got ${typeof data.chunk.index}`)
+        }
+        if (typeof data.chunk.total !== "number") {
+          throw new Error(`Invalid chunk metadata: total must be a number, got ${typeof data.chunk.total}`)
         }
         
         // Send binary data with metadata header

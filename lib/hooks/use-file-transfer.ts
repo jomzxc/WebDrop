@@ -201,9 +201,11 @@ export function useFileTransfer(roomId: string) {
           })
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to save received file"
+        updateTransfer(fileId, { status: "failed" })
         toast({
           title: "Download failed",
-          description: "Failed to save received file",
+          description: errorMessage,
           variant: "destructive",
         })
       }

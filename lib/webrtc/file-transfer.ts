@@ -135,12 +135,16 @@ export class FileTransferManager {
 
   receiveChunk(chunk: FileChunk, onProgress: (fileId: string, progress: number) => void) {
     const transfer = this.pendingTransfers.get(chunk.id)
-    if (!transfer) return
+    if (!transfer) {
+      console.warn(`Received chunk for unknown transfer: ${chunk.id}`)
+      return
+    }
 
     // Validate chunk index to prevent out-of-bounds access
     if (chunk.index < 0 || chunk.index >= chunk.total) {
-      console.error(`Invalid chunk index ${chunk.index} for transfer ${chunk.id}`)
-      return
+      const errorMsg = `Invalid chunk index ${chunk.index} for transfer ${chunk.id} (expected 0-${chunk.total - 1})`
+      console.error(errorMsg)
+      throw new Error(errorMsg)
     }
 
     // Data is already an ArrayBuffer - no conversion needed
@@ -154,22 +158,27 @@ export class FileTransferManager {
 
   completeTransfer(fileId: string): Blob | null {
     const transfer = this.pendingTransfers.get(fileId)
-    if (!transfer) return null
+    if (!transfer) {
+      console.warn(`Attempted to complete unknown transfer: ${fileId}`)
+      return null
+    }
 
     // Verify all chunks were received to prevent corrupted file
     const expectedChunks = Math.ceil(transfer.metadata.size / CHUNK_SIZE)
     if (transfer.receivedChunks !== expectedChunks) {
-      console.error(`Incomplete transfer: received ${transfer.receivedChunks}/${expectedChunks} chunks`)
+      const errorMsg = `Incomplete transfer ${fileId}: received ${transfer.receivedChunks}/${expectedChunks} chunks`
+      console.error(errorMsg)
       this.pendingTransfers.delete(fileId)
-      return null
+      throw new Error(errorMsg)
     }
 
     // Verify no gaps in chunks array
     for (let i = 0; i < expectedChunks; i++) {
       if (!transfer.chunks[i]) {
-        console.error(`Missing chunk ${i} in transfer ${fileId}`)
+        const errorMsg = `Corrupted transfer ${fileId}: missing chunk ${i}/${expectedChunks}`
+        console.error(errorMsg)
         this.pendingTransfers.delete(fileId)
-        return null
+        throw new Error(errorMsg)
       }
     }
 
