@@ -20,6 +20,7 @@ export default function Header() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -37,6 +38,16 @@ export default function Header() {
 
     window.addEventListener("storage", handleStorageChange)
 
+    // Get initial auth state
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user ?? null)
+      if (user) {
+        fetchProfile(user.id)
+      } else {
+        setAuthLoading(false)
+      }
+    })
+
     // Listen for auth changes
     const {
       data: { subscription },
@@ -46,6 +57,7 @@ export default function Header() {
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
+        setAuthLoading(false)
       }
     })
 
@@ -60,6 +72,7 @@ export default function Header() {
     console.log("[v0] Header - Profile data:", data)
     console.log("[v0] Header - Avatar URL:", data?.avatar_url)
     setProfile(data)
+    setAuthLoading(false)
   }
 
   const toggleDarkMode = () => {
@@ -106,7 +119,11 @@ export default function Header() {
               {mounted && isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            {user ? (
+            {authLoading ? (
+              <div className="h-10 w-10 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">

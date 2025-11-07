@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null)
   const [username, setUsername] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isPageLoading, setIsPageLoading] = useState(true)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [identities, setIdentities] = useState<any[]>([])
   const router = useRouter()
@@ -52,6 +53,8 @@ export default function ProfilePage() {
       setProfile(profileData)
       setUsername(profileData.username || "")
     }
+
+    setIsPageLoading(false)
 
     if (forceRefresh) {
       router.refresh()
@@ -199,7 +202,16 @@ export default function ProfilePage() {
     return "U"
   }
 
-  if (!user) return null
+  if (!user || isPageLoading) {
+    return (
+      <main className="min-h-screen bg-background text-foreground flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </main>
+    )
+  }
 
   const currentAvatar = profile?.avatar_url
 
