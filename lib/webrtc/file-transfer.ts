@@ -1,5 +1,6 @@
 const CHUNK_SIZE = 16384 // 16KB chunks
 const MAX_BUFFERED_AMOUNT = 16 * 1024 * 1024 // 16MB buffer threshold
+const BUFFER_CHECK_INTERVAL = 100 // Check every 100ms instead of 10ms to reduce CPU usage
 
 export interface FileMetadata {
   name: string
@@ -54,8 +55,11 @@ export class FileTransferManager {
     for (let i = 0; i < totalChunks; i++) {
       // Wait if the buffer is too full to prevent memory issues
       if (getBufferedAmount) {
-        while (getBufferedAmount() > MAX_BUFFERED_AMOUNT) {
-          await new Promise((resolve) => setTimeout(resolve, 10))
+        let bufferedAmount = getBufferedAmount()
+        while (bufferedAmount > MAX_BUFFERED_AMOUNT) {
+          // Use longer interval to avoid tight loop and excessive CPU usage
+          await new Promise((resolve) => setTimeout(resolve, BUFFER_CHECK_INTERVAL))
+          bufferedAmount = getBufferedAmount()
         }
       }
 
