@@ -139,6 +139,7 @@ export class FileTransferManager {
     // Store total chunks (can be set from any chunk, not just the first one)
     if (transfer.totalChunks === 0 && chunk.total > 0) {
       transfer.totalChunks = chunk.total
+      console.log(`[receiveChunk] Total chunks set to ${chunk.total} for file ${chunk.id}`)
     }
 
     // Write chunk immediately to stream
@@ -162,12 +163,19 @@ export class FileTransferManager {
     const progress = transfer.totalChunks > 0 
       ? Math.min((transfer.receivedChunks / transfer.totalChunks) * 100, 100)
       : 0
+    
+    if (chunk.index % 10 === 0 || transfer.receivedChunks === transfer.totalChunks) {
+      console.log(`[receiveChunk] Progress: ${progress.toFixed(1)}% (${transfer.receivedChunks}/${transfer.totalChunks} chunks) for file ${chunk.id}`)
+    }
+    
     onProgress(chunk.id, progress)
   }
 
   async completeTransfer(fileId: string): Promise<void> {
     const transfer = this.pendingTransfers.get(fileId)
     if (!transfer) return
+
+    console.log(`[completeTransfer] Starting for file ${fileId}. Received: ${transfer.receivedChunks}, Total: ${transfer.totalChunks}, Buffered: ${transfer.chunks.size}`)
 
     // Wait for all chunks to be written before closing
     // This handles the case where file-complete arrives before all chunks are processed
@@ -187,6 +195,8 @@ export class FileTransferManager {
       waitTime = Math.min(waitTime * 1.5, 500) // Max 500ms between checks
     }
 
+    console.log(`[completeTransfer] All chunks received. Received: ${transfer.receivedChunks}, Total: ${transfer.totalChunks}`)
+
     // Wait for any buffered chunks to be written (separate timeout)
     startTime = Date.now()
     waitTime = 50
@@ -201,9 +211,13 @@ export class FileTransferManager {
       waitTime = Math.min(waitTime * 1.5, 500) // Max 500ms between checks
     }
 
-    // Close the writer
+    console.log(`[completeTransfer] All buffered chunks written. Buffered: ${transfer.chunks.size}`)
+
+    // Close the writer - this should flush all data to disk
     try {
+      console.log(`[completeTransfer] Closing writer for file ${fileId}`)
       await transfer.writer.close()
+      console.log(`[completeTransfer] Writer closed successfully for file ${fileId}`)
     } catch (error) {
       console.error("Error closing stream writer:", error)
     }
