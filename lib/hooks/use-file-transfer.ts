@@ -294,7 +294,7 @@ export function useFileTransfer(roomId: string) {
             // pendingSends.current.delete(ack.fileId) - moved to handleTransferComplete
 
             toast({
-              title: "File sent",
+              title: "File chunks sent",
               description: "Waiting for recipient confirmation",
             })
           } catch (error) {
