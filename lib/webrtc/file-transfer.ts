@@ -15,6 +15,12 @@ export interface FileChunk {
   total: number
 }
 
+export interface FileTransferAck {
+  fileId: string
+  accepted: boolean
+  reason?: string
+}
+
 export class FileTransferManager {
   private pendingTransfers = new Map<
     string,

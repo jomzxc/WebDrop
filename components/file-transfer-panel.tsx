@@ -185,8 +185,14 @@ export default function FileTransferPanel({
                     <div className="flex items-center gap-2">
                       {transfer.status === "completed" && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                       {transfer.status === "failed" && <AlertCircle className="w-5 h-5 text-red-500" />}
+                      {transfer.status === "rejected" && <X className="w-5 h-5 text-orange-500" />}
+                      {transfer.status === "waiting-for-acceptance" && (
+                        <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                      )}
                       <p className="text-sm font-bold text-accent min-w-12 text-right">
-                        {Math.round(transfer.progress)}%
+                        {transfer.status === "waiting-for-acceptance" 
+                          ? "Waiting" 
+                          : `${Math.round(transfer.progress)}%`}
                       </p>
                     </div>
                   </div>
@@ -198,9 +204,13 @@ export default function FileTransferPanel({
                           ? "bg-gradient-to-r from-green-500 to-green-400"
                           : transfer.status === "failed"
                             ? "bg-gradient-to-r from-red-500 to-red-400"
-                            : transfer.direction === "sending"
-                              ? "bg-gradient-to-r from-accent to-primary"
-                              : "bg-gradient-to-r from-primary to-accent"
+                            : transfer.status === "rejected"
+                              ? "bg-gradient-to-r from-orange-500 to-orange-400"
+                              : transfer.status === "waiting-for-acceptance"
+                                ? "bg-gradient-to-r from-yellow-500 to-yellow-400 animate-pulse"
+                                : transfer.direction === "sending"
+                                  ? "bg-gradient-to-r from-accent to-primary"
+                                  : "bg-gradient-to-r from-primary to-accent"
                       }`}
                       style={{ width: `${transfer.progress}%` }}
                     />
