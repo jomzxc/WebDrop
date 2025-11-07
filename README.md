@@ -48,7 +48,7 @@ WebDrop is built as a modern, serverless web application using Next.js and Supab
 5. **File Transfer** – Files are chunked and sent over encrypted WebRTC data channels, then reassembled in the receiver's browser.
 
 **Signaling Flow:**
-```
+\`\`\`
 User A (Initiator)          Supabase Realtime          User B (Responder)
       |                             |                           |
       |--- Broadcast Offer -------->|------ Forward Offer ----->|
@@ -60,7 +60,7 @@ User A (Initiator)          Supabase Realtime          User B (Responder)
       |============ WebRTC Direct Connection Established ========|
       |                             |                           |
       |<========= Encrypted File Transfer (P2P) ===============>|
-```
+\`\`\`
 
 ---
 
@@ -112,41 +112,41 @@ Navigate to the **SQL Editor** in your Supabase dashboard and run the scripts in
 
 #### Clone the Repository
 
-```bash
+\`\`\`bash
 git clone https://github.com/YOUR-USERNAME/WebDrop.git
 cd WebDrop
-```
+\`\`\`
 
 #### Install Dependencies
 
 Using npm:
-```bash
+\`\`\`bash
 npm install --legacy-peer-deps
-```
+\`\`\`
 
 Or using pnpm:
-```bash
+\`\`\`bash
 pnpm install
-```
+\`\`\`
 
 #### Configure Environment Variables
 
 Create a `.env.local` file in the project root:
 
-```bash
+\`\`\`bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
+\`\`\`
 
 > **Note:** These values are found in **Supabase Dashboard → Project Settings → API**.
 
 #### Run the Development Server
 
-```bash
+\`\`\`bash
 npm run dev
 # or
 pnpm dev
-```
+\`\`\`
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 
@@ -156,9 +156,9 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ### Build for Production
 
-```bash
+\`\`\`bash
 npm run build
-```
+\`\`\`
 
 The app can be built without environment variables (useful for CI/CD), but it requires valid Supabase credentials at runtime.
 
@@ -194,7 +194,7 @@ If you'd like to contribute tests, see [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## 📁 Project Structure
 
-```
+\`\`\`
 WebDrop/
 ├── app/                      # Next.js App Router pages
 │   ├── auth/                 # Authentication pages (login, signup, callback)
@@ -224,7 +224,7 @@ WebDrop/
 ├── next.config.mjs           # Next.js configuration
 ├── tsconfig.json             # TypeScript configuration
 └── package.json              # Dependencies and scripts
-```
+\`\`\`
 
 ---
 
