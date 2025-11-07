@@ -71,9 +71,6 @@ export class PeerConnection {
   private createDataChannel() {
     this.dataChannel = this.pc.createDataChannel("fileTransfer", {
       ordered: true,
-      // Increase buffer thresholds to handle large file transfers
-      // Default maxPacketLifeTime is undefined (reliable channel)
-      // These settings help prevent channel closure during large transfers
     })
     this.setupDataChannel()
   }
@@ -208,8 +205,7 @@ export class PeerConnection {
   sendData(data: any) {
     if (!this.dataChannel || this.dataChannel.readyState !== "open") {
       const state = this.dataChannel?.readyState || "null"
-      this.onErrorCallback?.(new Error(`Data channel not open (state: ${state})`))
-      return
+      throw new Error(`Data channel not open (state: ${state})`)
     }
 
     try {
@@ -242,9 +238,10 @@ export class PeerConnection {
     } catch (error) {
       // Preserve the actual error message for better debugging
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      const enhancedError = new Error(`Failed to send data: ${errorMessage}`)
       console.error("Failed to send data:", errorMessage, error)
-      this.onErrorCallback?.(new Error(`Failed to send data: ${errorMessage}`))
-      throw error // Re-throw to propagate the error up
+      // Throw error to propagate up - error will be caught by sendFile in use-file-transfer.ts
+      throw enhancedError
     }
   }
 

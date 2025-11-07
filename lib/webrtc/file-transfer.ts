@@ -1,6 +1,7 @@
 const CHUNK_SIZE = 16384 // 16KB chunks
 const MAX_BUFFERED_AMOUNT = 16 * 1024 * 1024 // 16MB buffer threshold
 const BUFFER_CHECK_INTERVAL = 100 // Check every 100ms instead of 10ms to reduce CPU usage
+const POST_SEND_DELAY_MS = 10 // Small delay after sending to allow buffer to drain
 
 export interface FileMetadata {
   name: string
@@ -87,7 +88,7 @@ export class FileTransferManager {
       // Add a small delay after sending to allow buffer to drain
       // This prevents rapid successive sends from overwhelming the channel
       if (getBufferedAmount && getBufferedAmount() > MAX_BUFFERED_AMOUNT / 2) {
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, POST_SEND_DELAY_MS))
       }
     }
 
