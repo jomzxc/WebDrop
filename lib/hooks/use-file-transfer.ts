@@ -132,28 +132,32 @@ export function useFileTransfer(roomId: string) {
         return
       }
 
+      // Check if showSaveFilePicker is available (modern browsers)
+      if (typeof window === "undefined" || !("showSaveFilePicker" in window)) {
+        toast({
+          title: "Browser not supported",
+          description: "Your browser doesn't support file streaming. Please use Chrome 86+, Edge 86+, or Safari 15.2+ to receive files.",
+          variant: "destructive",
+        })
+        return
+      }
+
       try {
-        // Check if showSaveFilePicker is available (modern browsers)
-        if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
-          // Use File System Access API for streaming
-          const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
-            suggestedName: metadata.name,
-            types: [
-              {
-                description: "Files",
-                accept: { "*/*": [] },
-              },
-            ],
-          })
-          const writableStream = await fileHandle.createWritable()
-          const writer = writableStream.getWriter()
-          
-          fileStreams.current.set(metadata.id, writableStream)
-          transferManager.current.receiveMetadata(metadata, writer)
-        } else {
-          // Fallback to buffering mode for browsers without File System Access API
-          transferManager.current.receiveMetadata(metadata, null)
-        }
+        // Use File System Access API for streaming
+        const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
+          suggestedName: metadata.name,
+          types: [
+            {
+              description: "Files",
+              accept: { "*/*": [] },
+            },
+          ],
+        })
+        const writableStream = await fileHandle.createWritable()
+        const writer = writableStream.getWriter()
+        
+        fileStreams.current.set(metadata.id, writableStream)
+        transferManager.current.receiveMetadata(metadata, writer)
 
         addTransfer({
           id: metadata.id,
@@ -179,22 +183,10 @@ export function useFileTransfer(roomId: string) {
           })
         } else {
           console.error("Error setting up file transfer:", error)
-          // Fallback to buffering mode
-          transferManager.current.receiveMetadata(metadata, null)
-          
-          addTransfer({
-            id: metadata.id,
-            fileName: metadata.name,
-            fileSize: metadata.size,
-            progress: 0,
-            status: "transferring",
-            direction: "receiving",
-            peerName,
-          })
-
           toast({
-            title: "Receiving file",
-            description: `${metadata.name} from ${peerName}`,
+            title: "Transfer error",
+            description: "Failed to set up file transfer",
+            variant: "destructive",
           })
         }
       }
@@ -224,7 +216,7 @@ export function useFileTransfer(roomId: string) {
       try {
         // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
-        const blob = await transferManager.current.completeTransfer(fileId)
+        await transferManager.current.completeTransfer(fileId)
 
         // Check if we used streaming mode
         const usedStreaming = fileStreams.current.has(fileId)
@@ -232,32 +224,20 @@ export function useFileTransfer(roomId: string) {
           fileStreams.current.delete(fileId)
         }
 
-        if (usedStreaming || (blob && metadata)) {
+        if (usedStreaming && metadata) {
           // For streaming mode, file is already saved
-          // For buffering mode, trigger download
-          if (blob && metadata) {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement("a")
-            a.href = url
-            a.download = metadata.name
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-
           updateTransfer(fileId, { progress: 100, status: "completed" })
 
           toast({
             title: "File received",
-            description: metadata ? `${metadata.name} downloaded successfully` : "File downloaded successfully",
+            description: `${metadata.name} downloaded successfully`,
           })
         } else {
-          // Add a fallback in case metadata was somehow missing
+          // Streaming mode should always be used now
           updateTransfer(fileId, { status: "failed" })
           toast({
             title: "Download failed",
-            description: "Failed to assemble received file.",
+            description: "Failed to complete file transfer.",
             variant: "destructive",
           })
         }

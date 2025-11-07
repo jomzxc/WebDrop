@@ -45,7 +45,7 @@ WebDrop is built as a modern, serverless web application using Next.js and Supab
 2. **Room Creation/Join** – Users create a new room or join an existing one with a room ID.
 3. **Presence & Signaling** – Supabase Realtime manages user presence and broadcasts WebRTC signaling messages (offers, answers, ICE candidates).
 4. **WebRTC Connection** – Direct peer-to-peer connections are established between browsers.
-5. **File Transfer** – Files are chunked and sent over encrypted WebRTC data channels. In modern browsers, files are streamed directly to disk as they arrive, eliminating memory issues with large files.
+5. **File Transfer** – Files are chunked and sent over encrypted WebRTC data channels, then streamed directly to disk as they arrive.
 
 **Signaling Flow:**
 ```
@@ -230,25 +230,25 @@ WebDrop/
 
 ## 💾 File Transfer Technology
 
-WebDrop uses advanced streaming technology to efficiently handle large files:
+WebDrop uses streaming technology to efficiently handle large files up to 2GB:
 
-**Default limit:** 2GB per file
+**File size limit:** 2GB per file
 
-### Streaming Mode (Modern Browsers)
-In Chrome/Edge 86+ and Safari 15.2+, files are **streamed directly to disk** using the File System Access API:
+### Streaming to Disk
+Files are **streamed directly to disk** using the File System Access API:
 - **Zero memory overhead** – chunks are written to disk as they arrive
 - Users choose save location before transfer starts
 - Memory usage remains constant regardless of file size
 - Perfect for large files up to 2GB
 
-### Buffering Mode (Fallback)
-For older browsers, files are buffered in memory before download:
-- Works on all modern browsers
-- Automatic fallback when streaming is unavailable
-- Enhanced error detection for incomplete transfers
-- Recommended to keep files under 500MB to avoid memory issues on low-end devices
+### Browser Requirements
+**Supported browsers:**
+- Chrome/Edge 86 or later
+- Safari 15.2 or later
 
-The limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant. The 2GB limit works reliably with streaming mode, while buffering mode may encounter memory constraints with very large files.
+**Unsupported browsers** will receive an error message when attempting to receive files. Users should upgrade to a modern browser to use WebDrop's file transfer feature.
+
+The limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant.
 
 ---
 
