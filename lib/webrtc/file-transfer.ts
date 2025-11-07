@@ -30,6 +30,7 @@ export class FileTransferManager {
       receivedChunks: number
       totalChunks: number
       chunks: Map<number, ArrayBuffer>
+      isWriting: boolean // Lock to prevent concurrent writes
     }
   >()
 
@@ -134,6 +135,7 @@ export class FileTransferManager {
       receivedChunks: 0,
       totalChunks: 0,
       chunks: new Map(),
+      isWriting: false,
     })
   }
 
@@ -163,7 +165,15 @@ export class FileTransferManager {
       transfer.chunks.set(chunk.index, arrayBuffer)
       
       // Write all sequential chunks starting from receivedChunks
-      await this.writeSequentialChunks(transfer)
+      // Use lock to prevent concurrent writes
+      if (!transfer.isWriting) {
+        transfer.isWriting = true
+        try {
+          await this.writeSequentialChunks(transfer)
+        } finally {
+          transfer.isWriting = false
+        }
+      }
     } catch (error) {
       console.error("Error writing chunk to stream:", error)
       throw error
