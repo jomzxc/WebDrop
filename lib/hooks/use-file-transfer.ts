@@ -10,7 +10,7 @@ export interface Transfer {
   fileName: string
   fileSize: number
   progress: number
-  status: "pending" | "waiting-for-acceptance" | "transferring" | "completed" | "failed" | "rejected"
+  status: "pending" | "transferring" | "completed" | "failed"
   direction: "sending" | "receiving"
   peerId?: string
   peerName?: string
@@ -66,7 +66,7 @@ export function useFileTransfer(roomId: string) {
         fileName: file.name,
         fileSize: file.size,
         progress: 0,
-        status: "waiting-for-acceptance",
+        status: "transferring",
         direction: "sending",
         peerId,
         peerName,
@@ -74,15 +74,14 @@ export function useFileTransfer(roomId: string) {
 
       try {
         await transferManager.current.sendFile(file, peerId, sendData, (progress) => {
-          updateTransfer(transferId, { progress, status: "transferring" })
+          updateTransfer(transferId, { progress })
         }, getBufferedAmount)
 
-        // Don't mark as completed yet - wait for receiver acknowledgment
-        updateTransfer(transferId, { progress: 100, status: "waiting-for-acceptance" })
+        updateTransfer(transferId, { progress: 100, status: "completed" })
 
         toast({
           title: "File sent",
-          description: `Waiting for ${peerName} to accept ${file.name}`,
+          description: `${file.name} sent to ${peerName}`,
         })
 
         // Log to database
@@ -96,8 +95,8 @@ export function useFileTransfer(roomId: string) {
             receiver_id: peerId,
             file_name: file.name,
             file_size: file.size,
-            status: "pending",
-            completed_at: null,
+            status: "completed",
+            completed_at: new Date().toISOString(),
           })
         }
       } catch (error) {
@@ -114,20 +113,12 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileMetadata = useCallback(
-    async (metadata: any, peerName: string, sendAck: (data: any) => void) => {
+    async (metadata: any, peerName: string) => {
       if (!metadata?.id || !metadata?.name || !metadata?.size) {
         toast({
           title: "Invalid file metadata",
           description: "Received invalid file information",
           variant: "destructive",
-        })
-        sendAck({
-          type: "file-ack",
-          ack: {
-            fileId: metadata?.id || "unknown",
-            accepted: false,
-            reason: "Invalid file metadata",
-          },
         })
         return
       }
@@ -138,14 +129,6 @@ export function useFileTransfer(roomId: string) {
           description: `${peerName} tried to send a file larger than ${MAX_FILE_SIZE / 1024 / 1024}MB`,
           variant: "destructive",
         })
-        sendAck({
-          type: "file-ack",
-          ack: {
-            fileId: metadata.id,
-            accepted: false,
-            reason: "File too large",
-          },
-        })
         return
       }
 
@@ -155,14 +138,6 @@ export function useFileTransfer(roomId: string) {
           title: "Browser not supported",
           description: "Your browser doesn't support file streaming. Please use Chrome 86+, Edge 86+, or Safari 15.2+ to receive files.",
           variant: "destructive",
-        })
-        sendAck({
-          type: "file-ack",
-          ack: {
-            fileId: metadata.id,
-            accepted: false,
-            reason: "Browser not supported",
-          },
         })
         return
       }
@@ -188,15 +163,6 @@ export function useFileTransfer(roomId: string) {
           peerName,
         })
 
-        // Send acknowledgment to sender
-        sendAck({
-          type: "file-ack",
-          ack: {
-            fileId: metadata.id,
-            accepted: true,
-          },
-        })
-
         toast({
           title: "Receiving file",
           description: `${metadata.name} from ${peerName}`,
@@ -209,28 +175,12 @@ export function useFileTransfer(roomId: string) {
             description: "File download was cancelled",
             variant: "destructive",
           })
-          sendAck({
-            type: "file-ack",
-            ack: {
-              fileId: metadata.id,
-              accepted: false,
-              reason: "User cancelled",
-            },
-          })
         } else {
           console.error("Error setting up file transfer:", error)
           toast({
             title: "Transfer error",
             description: "Failed to set up file transfer",
             variant: "destructive",
-          })
-          sendAck({
-            type: "file-ack",
-            ack: {
-              fileId: metadata.id,
-              accepted: false,
-              reason: "Failed to set up file transfer",
-            },
           })
         }
       }
@@ -256,7 +206,7 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileComplete = useCallback(
-    async (fileId: string, sendComplete?: (data: any) => void) => {
+    async (fileId: string) => {
       try {
         // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
@@ -283,14 +233,6 @@ export function useFileTransfer(roomId: string) {
             title: "File received",
             description: `${metadata.name} downloaded successfully`,
           })
-
-          // Send completion ack to sender
-          if (sendComplete) {
-            sendComplete({
-              type: "file-transfer-complete",
-              fileId,
-            })
-          }
         } else {
           // Streaming mode should always be used now
           updateTransfer(fileId, { status: "failed" })
@@ -311,45 +253,12 @@ export function useFileTransfer(roomId: string) {
     [updateTransfer, toast],
   )
 
-  const handleFileAck = useCallback(
-    (ack: { fileId: string; accepted: boolean; reason?: string }) => {
-      if (ack.accepted) {
-        updateTransfer(ack.fileId, { status: "transferring" })
-        toast({
-          title: "Transfer accepted",
-          description: "Recipient is downloading the file",
-        })
-      } else {
-        updateTransfer(ack.fileId, { status: "rejected" })
-        toast({
-          title: "Transfer rejected",
-          description: ack.reason || "Recipient rejected the file",
-          variant: "destructive",
-        })
-      }
-    },
-    [updateTransfer, toast],
-  )
-
-  const handleTransferComplete = useCallback(
-    (fileId: string) => {
-      updateTransfer(fileId, { status: "completed" })
-      toast({
-        title: "Transfer complete",
-        description: "File successfully received by recipient",
-      })
-    },
-    [updateTransfer, toast],
-  )
-
   return {
     transfers,
     sendFile,
     handleFileMetadata,
     handleFileChunk,
     handleFileComplete,
-    handleFileAck,
-    handleTransferComplete,
     clearTransfers,
   }
 }
