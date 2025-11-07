@@ -139,7 +139,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-semibold">Memory Efficient</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    Stream files directly to disk. Transfer up to 500MB without memory issues.
+                    Stream files directly to disk. Transfer up to 2GB without memory issues.
                   </p>
                 </CardContent>
               </Card>
