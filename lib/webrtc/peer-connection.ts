@@ -100,6 +100,10 @@ export class PeerConnection {
             }
             this.pendingBinaryMetadata = null
             this.onDataCallback?.(completeData)
+          } else {
+            // Unexpected binary data - log error
+            console.error("Received binary data without metadata")
+            this.onErrorCallback?.(new Error("Received binary data without metadata"))
           }
         } else {
           // Handle JSON messages

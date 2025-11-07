@@ -35,11 +35,13 @@ export function useRoom(roomId: string | null) {
 
       if (peersData && peersData.length > 0) {
         // Map the joined data to the expected format
-        const peersWithAvatars = peersData.map((peer: any) => ({
-          ...peer,
-          avatar_url: peer.profiles?.avatar_url || null,
-          profiles: undefined, // Remove the nested profiles object
-        }))
+        const peersWithAvatars = peersData.map((peerData: any) => {
+          const { profiles, ...peer } = peerData
+          return {
+            ...peer,
+            avatar_url: profiles?.avatar_url || null,
+          }
+        })
 
         setPeers(peersWithAvatars)
       } else {
