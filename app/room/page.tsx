@@ -35,7 +35,7 @@ export default function RoomPage() {
   const { peers, onlineUserIds, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(
     connected ? roomId : null,
   )
-  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete, clearTransfers } =
+  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete, handleFileAck, handleTransferComplete, clearTransfers } =
     useFileTransfer(roomId)
 
   const sendSignalRef = useRef<((toPeerId: string, signal: any) => Promise<void>) | undefined>(undefined)
@@ -58,11 +58,19 @@ export default function RoomPage() {
         if (!data || !data.type) return
 
         if (data.type === "file-metadata") {
-          handleFileMetadata(data.metadata, username)
+          handleFileMetadata(data.metadata, username, (ackData) => {
+            pc.sendData(ackData)
+          })
         } else if (data.type === "file-chunk") {
           handleFileChunk(data.chunk)
         } else if (data.type === "file-complete") {
-          handleFileComplete(data.fileId)
+          handleFileComplete(data.fileId, (completeData) => {
+            pc.sendData(completeData)
+          })
+        } else if (data.type === "file-ack") {
+          handleFileAck(data.ack)
+        } else if (data.type === "file-transfer-complete") {
+          handleTransferComplete(data.fileId)
         }
       })
 
@@ -81,7 +89,7 @@ export default function RoomPage() {
 
       return pc
     },
-    [handleFileMetadata, handleFileChunk, handleFileComplete, toast],
+    [handleFileMetadata, handleFileChunk, handleFileComplete, handleFileAck, handleTransferComplete, toast],
   )
 
   useEffect(() => {
@@ -378,6 +386,16 @@ export default function RoomPage() {
         toast({
           title: "Connection not ready",
           description: "Please wait for the connection to fully establish",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check if browser supports File System Access API
+      if (typeof window === "undefined" || !("showSaveFilePicker" in window)) {
+        toast({
+          title: "Browser not supported",
+          description: "Your browser doesn't support modern file transfers. Please use Chrome 86+, Edge 86+, or Safari 15.2+.",
           variant: "destructive",
         })
         return
