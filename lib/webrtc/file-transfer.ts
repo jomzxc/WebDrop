@@ -168,25 +168,34 @@ export class FileTransferManager {
 
     // Wait for all chunks to be written before closing
     // This handles the case where file-complete arrives before all chunks are processed
-    const maxWaitTime = 30000 // 30 seconds max wait
-    const startTime = Date.now()
+    const maxWaitTime = 30000 // 30 seconds max wait per check
+    
+    // Wait for all expected chunks to arrive
+    let startTime = Date.now()
+    let waitTime = 50 // Start with 50ms, will increase exponentially
     
     while (transfer.receivedChunks < transfer.totalChunks) {
       if (Date.now() - startTime > maxWaitTime) {
         console.error(`Timeout waiting for chunks. Received ${transfer.receivedChunks}/${transfer.totalChunks}`)
         break
       }
-      // Wait a bit for more chunks to arrive and be processed
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      // Exponential backoff to reduce CPU usage
+      await new Promise((resolve) => setTimeout(resolve, waitTime))
+      waitTime = Math.min(waitTime * 1.5, 500) // Max 500ms between checks
     }
 
-    // Also wait for any buffered chunks to be written
+    // Wait for any buffered chunks to be written (separate timeout)
+    startTime = Date.now()
+    waitTime = 50
+    
     while (transfer.chunks.size > 0) {
       if (Date.now() - startTime > maxWaitTime) {
         console.error(`Timeout waiting for buffered chunks. Remaining: ${transfer.chunks.size}`)
         break
       }
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      // Exponential backoff to reduce CPU usage
+      await new Promise((resolve) => setTimeout(resolve, waitTime))
+      waitTime = Math.min(waitTime * 1.5, 500) // Max 500ms between checks
     }
 
     // Close the writer
