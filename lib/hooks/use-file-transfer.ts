@@ -21,7 +21,6 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 export function useFileTransfer(roomId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const transferManager = useRef(new FileTransferManager())
-  const fileStreams = useRef(new Map<string, WritableStream<Uint8Array>>())
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -36,7 +35,6 @@ export function useFileTransfer(roomId: string) {
   const clearTransfers = useCallback(() => {
     setTransfers([])
     transferManager.current.clearPendingTransfers()
-    fileStreams.current.clear()
   }, [])
 
   const sendFile = useCallback(
@@ -113,7 +111,7 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileMetadata = useCallback(
-    async (metadata: any, peerName: string) => {
+    (metadata: any, peerName: string) => {
       if (!metadata?.id || !metadata?.name || !metadata?.size) {
         toast({
           title: "Invalid file metadata",
@@ -132,80 +130,30 @@ export function useFileTransfer(roomId: string) {
         return
       }
 
-      try {
-        // Check if showSaveFilePicker is available (modern browsers)
-        if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
-          // Use File System Access API for streaming
-          const fileHandle = await (window as any).showSaveFilePicker({
-            suggestedName: metadata.name,
-            types: [
-              {
-                description: "Files",
-                accept: { [metadata.type || "application/octet-stream"]: [] },
-              },
-            ],
-          })
-          const writableStream = await fileHandle.createWritable()
-          const writer = writableStream.getWriter()
-          
-          fileStreams.current.set(metadata.id, writableStream)
-          transferManager.current.receiveMetadata(metadata, writer)
-        } else {
-          // Fallback to buffering mode for browsers without File System Access API
-          transferManager.current.receiveMetadata(metadata, null)
-        }
+      transferManager.current.receiveMetadata(metadata)
 
-        addTransfer({
-          id: metadata.id,
-          fileName: metadata.name,
-          fileSize: metadata.size,
-          progress: 0,
-          status: "transferring",
-          direction: "receiving",
-          peerName,
-        })
+      addTransfer({
+        id: metadata.id,
+        fileName: metadata.name,
+        fileSize: metadata.size,
+        progress: 0,
+        status: "transferring",
+        direction: "receiving",
+        peerName,
+      })
 
-        toast({
-          title: "Receiving file",
-          description: `${metadata.name} from ${peerName}`,
-        })
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          // User cancelled the file picker
-          toast({
-            title: "Transfer cancelled",
-            description: "File download was cancelled",
-            variant: "destructive",
-          })
-        } else {
-          console.error("Error setting up file transfer:", error)
-          // Fallback to buffering mode
-          transferManager.current.receiveMetadata(metadata, null)
-          
-          addTransfer({
-            id: metadata.id,
-            fileName: metadata.name,
-            fileSize: metadata.size,
-            progress: 0,
-            status: "transferring",
-            direction: "receiving",
-            peerName,
-          })
-
-          toast({
-            title: "Receiving file",
-            description: `${metadata.name} from ${peerName}`,
-          })
-        }
-      }
+      toast({
+        title: "Receiving file",
+        description: `${metadata.name} from ${peerName}`,
+      })
     },
     [addTransfer, toast],
   )
 
   const handleFileChunk = useCallback(
-    async (chunk: any) => {
+    (chunk: any) => {
       try {
-        await transferManager.current.receiveChunk(chunk, (fileId, progress) => {
+        transferManager.current.receiveChunk(chunk, (fileId, progress) => {
           updateTransfer(fileId, { progress })
         })
       } catch (error) {
@@ -220,37 +168,28 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileComplete = useCallback(
-    async (fileId: string) => {
+    (fileId: string) => {
       try {
         // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
-        const blob = await transferManager.current.completeTransfer(fileId)
+        const blob = transferManager.current.completeTransfer(fileId)
 
-        // Check if we used streaming mode
-        const usedStreaming = fileStreams.current.has(fileId)
-        if (usedStreaming) {
-          fileStreams.current.delete(fileId)
-        }
-
-        if (usedStreaming || (blob && metadata)) {
-          // For streaming mode, file is already saved
-          // For buffering mode, trigger download
-          if (blob && metadata) {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement("a")
-            a.href = url
-            a.download = metadata.name
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
+        if (blob && metadata) {
+          // Trigger download
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = metadata.name
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
 
           updateTransfer(fileId, { progress: 100, status: "completed" })
 
           toast({
             title: "File received",
-            description: metadata ? `${metadata.name} downloaded successfully` : "File downloaded successfully",
+            description: `${metadata.name} downloaded successfully`,
           })
         } else {
           // Add a fallback in case metadata was somehow missing
