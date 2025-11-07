@@ -31,10 +31,15 @@ export function useRoom(roomId: string | null) {
       if (peersData && peersData.length > 0) {
         // Fetch corresponding profiles for avatar URLs
         const userIds = peersData.map((p) => p.user_id)
-        const { data: profilesData } = await supabase
+        const { data: profilesData, error: profilesError } = await supabase
           .from("profiles")
           .select("id, avatar_url")
           .in("id", userIds)
+
+        // Log profile fetch errors but don't fail - avatars are optional
+        if (profilesError) {
+          console.warn("Could not fetch profiles for avatars:", profilesError)
+        }
 
         // Create a map of user_id to avatar_url for quick lookup
         const avatarMap = new Map(profilesData?.map((p) => [p.id, p.avatar_url]) || [])
