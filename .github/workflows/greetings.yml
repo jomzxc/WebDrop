@@ -1,0 +1,21 @@
+name: Greetings
+
+on:
+  pull_request_target:
+  issues:
+
+jobs:
+  greet-contributor:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: First Interaction Greeting
+        uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            👋 Hello! Thanks for opening your first issue. We’re thrilled to have you here. Please include as much detail as possible so we can help effectively.
+          pr-message: |
+            🚀 Thanks for your first pull request! We appreciate your effort and will review it soon. Feel free to check out our contribution guidelines if you haven’t already.
