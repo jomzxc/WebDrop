@@ -19,29 +19,31 @@ export function useRoom(roomId: string | null) {
     if (!roomId) return
 
     try {
-      // Fetch peers with profiles in a single optimized query using a join
+      // Fetch peers first
       const { data: peersData, error: peersError } = await supabase
         .from("peers")
-        .select(`
-          *,
-          profiles!peers_user_id_fkey (
-            avatar_url
-          )
-        `)
+        .select("*")
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true })
 
       if (peersError) throw peersError
 
       if (peersData && peersData.length > 0) {
-        // Map the joined data to the expected format
-        const peersWithAvatars = peersData.map((peerData: any) => {
-          const { profiles, ...peer } = peerData
-          return {
-            ...peer,
-            avatar_url: profiles?.avatar_url || null,
-          }
-        })
+        // Fetch corresponding profiles for avatar URLs
+        const userIds = peersData.map((p) => p.user_id)
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, avatar_url")
+          .in("id", userIds)
+
+        // Create a map of user_id to avatar_url for quick lookup
+        const avatarMap = new Map(profilesData?.map((p) => [p.id, p.avatar_url]) || [])
+
+        // Combine peers with their avatar URLs
+        const peersWithAvatars = peersData.map((peer) => ({
+          ...peer,
+          avatar_url: avatarMap.get(peer.user_id) || null,
+        }))
 
         setPeers(peersWithAvatars)
       } else {
