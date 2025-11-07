@@ -141,6 +141,8 @@ export class FileTransferManager {
     const transfer = this.pendingTransfers.get(chunk.id)
     if (!transfer) return
 
+    console.log(`[receiveChunk] Received chunk ${chunk.index} for file ${chunk.id}`)
+
     // Data is already an ArrayBuffer - no conversion needed
     const arrayBuffer = chunk.data instanceof ArrayBuffer ? chunk.data : new Uint8Array(chunk.data).buffer
     
@@ -148,6 +150,11 @@ export class FileTransferManager {
     if (transfer.totalChunks === 0 && chunk.total > 0) {
       transfer.totalChunks = chunk.total
       console.log(`[receiveChunk] Total chunks set to ${chunk.total} for file ${chunk.id}`)
+    }
+
+    // Check if this chunk was already received
+    if (transfer.chunks.has(chunk.index)) {
+      console.warn(`[receiveChunk] WARNING: Duplicate chunk ${chunk.index} received for file ${chunk.id}`)
     }
 
     // Write chunk immediately to stream
@@ -184,6 +191,7 @@ export class FileTransferManager {
     // Write all sequential chunks starting from receivedChunks
     while (transfer.chunks.has(transfer.receivedChunks)) {
       const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
+      console.log(`[writeSequentialChunks] Writing chunk ${transfer.receivedChunks} (receivedChunks will become ${transfer.receivedChunks + 1})`)
       await transfer.writer.write(new Uint8Array(nextChunk))
       transfer.chunks.delete(transfer.receivedChunks)
       transfer.receivedChunks++
