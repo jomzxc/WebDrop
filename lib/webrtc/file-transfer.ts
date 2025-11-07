@@ -95,6 +95,54 @@ export class FileTransferManager {
     })
   }
 
+  async sendFileChunks(
+    file: File,
+    fileId: string,
+    peerId: string,
+    sendData: (data: any) => void,
+    onProgress: (progress: number) => void,
+    getBufferedAmount?: () => number,
+  ): Promise<void> {
+    // Send only file chunks, without metadata (metadata was already sent)
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+    let sentChunks = 0
+
+    for (let i = 0; i < totalChunks; i++) {
+      // Wait if the buffer is too full to prevent memory issues
+      if (getBufferedAmount) {
+        while (getBufferedAmount() > MAX_BUFFERED_AMOUNT) {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+      }
+
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const chunk = file.slice(start, end)
+      const arrayBuffer = await chunk.arrayBuffer()
+
+      // Send ArrayBuffer directly - avoid expensive Array conversion
+      sendData({
+        type: "file-chunk",
+        chunk: {
+          id: fileId,
+          index: i,
+          data: arrayBuffer,
+          total: totalChunks,
+        },
+        peerId,
+      })
+
+      sentChunks++
+      onProgress((sentChunks / totalChunks) * 100)
+    }
+
+    sendData({
+      type: "file-complete",
+      fileId,
+      peerId,
+    })
+  }
+
   receiveMetadata(metadata: FileMetadata, writer: WritableStreamDefaultWriter<Uint8Array>) {
     this.pendingTransfers.set(metadata.id, {
       metadata,

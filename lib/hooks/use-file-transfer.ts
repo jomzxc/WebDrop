@@ -271,7 +271,7 @@ export function useFileTransfer(roomId: string) {
           description: "Recipient is downloading the file",
         })
 
-        // Now send the actual file chunks
+        // Now send the actual file chunks (metadata was already sent)
         const pendingSend = pendingSends.current.get(ack.fileId)
         if (pendingSend) {
           const { file, sendData, getBufferedAmount } = pendingSend
@@ -281,7 +281,8 @@ export function useFileTransfer(roomId: string) {
             const transfer = transfers.find(t => t.id === ack.fileId)
             const peerId = transfer?.peerId || ""
 
-            await transferManager.current.sendFile(file, peerId, sendData, (progress) => {
+            // Use sendFileChunks instead of sendFile to avoid sending metadata again
+            await transferManager.current.sendFileChunks(file, ack.fileId, peerId, sendData, (progress) => {
               updateTransfer(ack.fileId, { progress, status: "transferring" })
             }, getBufferedAmount)
 
