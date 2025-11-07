@@ -166,6 +166,29 @@ export class FileTransferManager {
     const transfer = this.pendingTransfers.get(fileId)
     if (!transfer) return
 
+    // Wait for all chunks to be written before closing
+    // This handles the case where file-complete arrives before all chunks are processed
+    const maxWaitTime = 30000 // 30 seconds max wait
+    const startTime = Date.now()
+    
+    while (transfer.receivedChunks < transfer.totalChunks) {
+      if (Date.now() - startTime > maxWaitTime) {
+        console.error(`Timeout waiting for chunks. Received ${transfer.receivedChunks}/${transfer.totalChunks}`)
+        break
+      }
+      // Wait a bit for more chunks to arrive and be processed
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+
+    // Also wait for any buffered chunks to be written
+    while (transfer.chunks.size > 0) {
+      if (Date.now() - startTime > maxWaitTime) {
+        console.error(`Timeout waiting for buffered chunks. Remaining: ${transfer.chunks.size}`)
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+
     // Close the writer
     try {
       await transfer.writer.close()
