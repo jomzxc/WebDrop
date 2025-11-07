@@ -137,9 +137,9 @@ export default function LandingPage() {
                   <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center">
                     <Infinity className="w-7 h-7 text-accent" />
                   </div>
-                  <h3 className="text-xl font-semibold">Memory Efficient</h3>
+                  <h3 className="text-xl font-semibold">Unlimited Transfers</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    Stream files directly to disk. Transfer up to 2GB without memory issues.
+                    Transfer files up to 2GB as many times as you need. No daily limits.
                   </p>
                 </CardContent>
               </Card>
