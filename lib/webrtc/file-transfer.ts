@@ -158,7 +158,10 @@ export class FileTransferManager {
       throw error
     }
 
-    const progress = (transfer.receivedChunks / chunk.total) * 100
+    // Calculate progress using transfer.totalChunks for consistency, cap at 100%
+    const progress = transfer.totalChunks > 0 
+      ? Math.min((transfer.receivedChunks / transfer.totalChunks) * 100, 100)
+      : 0
     onProgress(chunk.id, progress)
   }
 

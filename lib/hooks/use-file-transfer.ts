@@ -286,12 +286,16 @@ export function useFileTransfer(roomId: string) {
               updateTransfer(ack.fileId, { progress, status: "transferring" })
             }, getBufferedAmount)
 
-            updateTransfer(ack.fileId, { progress: 100, status: "completed" })
-            pendingSends.current.delete(ack.fileId)
+            // Don't mark as completed yet - wait for receiver's confirmation
+            // Keep at 100% progress but status as "transferring" until confirmation
+            updateTransfer(ack.fileId, { progress: 100, status: "transferring" })
+            
+            // Don't delete pendingSends yet - wait for confirmation
+            // pendingSends.current.delete(ack.fileId) - moved to handleTransferComplete
 
             toast({
               title: "File sent",
-              description: "File successfully sent",
+              description: "Waiting for recipient confirmation",
             })
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
@@ -320,6 +324,8 @@ export function useFileTransfer(roomId: string) {
   const handleTransferComplete = useCallback(
     async (fileId: string) => {
       updateTransfer(fileId, { status: "completed" })
+      pendingSends.current.delete(fileId) // Clean up pending send
+      
       toast({
         title: "Transfer complete",
         description: "File successfully received by recipient",
