@@ -146,6 +146,7 @@ export function useFileTransfer(roomId: string) {
         // Use File System Access API for streaming
         const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
           suggestedName: metadata.name,
+          startIn: 'downloads',
           types: [
             {
               description: "Files",
