@@ -20,8 +20,10 @@ export class FileTransferManager {
     string,
     {
       metadata: FileMetadata
-      chunks: ArrayBuffer[]
+      writer: WritableStreamDefaultWriter<Uint8Array>
       receivedChunks: number
+      totalChunks: number
+      chunks: Map<number, ArrayBuffer>
     }
   >()
 
@@ -87,36 +89,60 @@ export class FileTransferManager {
     })
   }
 
-  receiveMetadata(metadata: FileMetadata) {
+  receiveMetadata(metadata: FileMetadata, writer: WritableStreamDefaultWriter<Uint8Array>) {
     this.pendingTransfers.set(metadata.id, {
       metadata,
-      chunks: [],
+      writer,
       receivedChunks: 0,
+      totalChunks: 0,
+      chunks: new Map(),
     })
   }
 
-  receiveChunk(chunk: FileChunk, onProgress: (fileId: string, progress: number) => void) {
+  async receiveChunk(chunk: FileChunk, onProgress: (fileId: string, progress: number) => void) {
     const transfer = this.pendingTransfers.get(chunk.id)
     if (!transfer) return
 
     // Data is already an ArrayBuffer - no conversion needed
     const arrayBuffer = chunk.data instanceof ArrayBuffer ? chunk.data : new Uint8Array(chunk.data).buffer
-    transfer.chunks[chunk.index] = arrayBuffer
-    transfer.receivedChunks++
+    
+    // Store total chunks (can be set from any chunk, not just the first one)
+    if (transfer.totalChunks === 0 && chunk.total > 0) {
+      transfer.totalChunks = chunk.total
+    }
+
+    // Write chunk immediately to stream
+    try {
+      // Store chunk temporarily if not in order
+      transfer.chunks.set(chunk.index, arrayBuffer)
+      
+      // Write all sequential chunks starting from receivedChunks
+      while (transfer.chunks.has(transfer.receivedChunks)) {
+        const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
+        await transfer.writer.write(new Uint8Array(nextChunk))
+        transfer.chunks.delete(transfer.receivedChunks)
+        transfer.receivedChunks++
+      }
+    } catch (error) {
+      console.error("Error writing chunk to stream:", error)
+      throw error
+    }
 
     const progress = (transfer.receivedChunks / chunk.total) * 100
     onProgress(chunk.id, progress)
   }
 
-  completeTransfer(fileId: string): Blob | null {
+  async completeTransfer(fileId: string): Promise<void> {
     const transfer = this.pendingTransfers.get(fileId)
-    if (!transfer) return null
+    if (!transfer) return
 
-    // Combine all chunks
-    const blob = new Blob(transfer.chunks, { type: transfer.metadata.type })
+    // Close the writer
+    try {
+      await transfer.writer.close()
+    } catch (error) {
+      console.error("Error closing stream writer:", error)
+    }
     this.pendingTransfers.delete(fileId)
-
-    return blob
   }
 
   getMetadata(fileId: string): FileMetadata | undefined {

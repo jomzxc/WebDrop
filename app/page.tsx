@@ -139,7 +139,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-semibold">Unlimited Transfers</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    Transfer files up to 500MB as many times as you need. No daily limits.
+                    Transfer files up to 2GB as many times as you need. No daily limits.
                   </p>
                 </CardContent>
               </Card>
@@ -192,7 +192,7 @@ export default function LandingPage() {
                   <h3 className="text-2xl font-semibold mb-2">Share Files Instantly</h3>
                   <p className="text-muted-foreground leading-relaxed">
                     Select files and choose recipients. Files are transferred directly between peers with end-to-end
-                    encryption.
+                    encryption. In modern browsers, files stream directly to disk for efficient memory usage.
                   </p>
                 </div>
               </div>

@@ -16,11 +16,12 @@ export interface Transfer {
   peerName?: string
 }
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024 // 2GB
 
 export function useFileTransfer(roomId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const transferManager = useRef(new FileTransferManager())
+  const fileStreams = useRef(new Map<string, WritableStream<Uint8Array>>())
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -35,6 +36,7 @@ export function useFileTransfer(roomId: string) {
   const clearTransfers = useCallback(() => {
     setTransfers([])
     transferManager.current.clearPendingTransfers()
+    fileStreams.current.clear()
   }, [])
 
   const sendFile = useCallback(
@@ -111,7 +113,7 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileMetadata = useCallback(
-    (metadata: any, peerName: string) => {
+    async (metadata: any, peerName: string) => {
       if (!metadata?.id || !metadata?.name || !metadata?.size) {
         toast({
           title: "Invalid file metadata",
@@ -130,30 +132,73 @@ export function useFileTransfer(roomId: string) {
         return
       }
 
-      transferManager.current.receiveMetadata(metadata)
+      // Check if showSaveFilePicker is available (modern browsers)
+      if (typeof window === "undefined" || !("showSaveFilePicker" in window)) {
+        toast({
+          title: "Browser not supported",
+          description: "Your browser doesn't support file streaming. Please use Chrome 86+, Edge 86+, or Safari 15.2+ to receive files.",
+          variant: "destructive",
+        })
+        return
+      }
 
-      addTransfer({
-        id: metadata.id,
-        fileName: metadata.name,
-        fileSize: metadata.size,
-        progress: 0,
-        status: "transferring",
-        direction: "receiving",
-        peerName,
-      })
+      try {
+        // Use File System Access API for streaming
+        const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
+          suggestedName: metadata.name,
+          startIn: 'downloads',
+          types: [
+            {
+              description: "Files",
+              accept: { "*/*": [] },
+            },
+          ],
+        })
+        const writableStream = await fileHandle.createWritable()
+        const writer = writableStream.getWriter()
+        
+        fileStreams.current.set(metadata.id, writableStream)
+        transferManager.current.receiveMetadata(metadata, writer)
 
-      toast({
-        title: "Receiving file",
-        description: `${metadata.name} from ${peerName}`,
-      })
+        addTransfer({
+          id: metadata.id,
+          fileName: metadata.name,
+          fileSize: metadata.size,
+          progress: 0,
+          status: "transferring",
+          direction: "receiving",
+          peerName,
+        })
+
+        toast({
+          title: "Receiving file",
+          description: `${metadata.name} from ${peerName}`,
+        })
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          // User cancelled the file picker
+          toast({
+            title: "Transfer cancelled",
+            description: "File download was cancelled",
+            variant: "destructive",
+          })
+        } else {
+          console.error("Error setting up file transfer:", error)
+          toast({
+            title: "Transfer error",
+            description: "Failed to set up file transfer",
+            variant: "destructive",
+          })
+        }
+      }
     },
     [addTransfer, toast],
   )
 
   const handleFileChunk = useCallback(
-    (chunk: any) => {
+    async (chunk: any) => {
       try {
-        transferManager.current.receiveChunk(chunk, (fileId, progress) => {
+        await transferManager.current.receiveChunk(chunk, (fileId, progress) => {
           updateTransfer(fileId, { progress })
         })
       } catch (error) {
@@ -168,23 +213,20 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileComplete = useCallback(
-    (fileId: string) => {
+    async (fileId: string) => {
       try {
         // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
-        const blob = transferManager.current.completeTransfer(fileId)
+        await transferManager.current.completeTransfer(fileId)
 
-        if (blob && metadata) {
-          // Trigger download
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          a.href = url
-          a.download = metadata.name
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          URL.revokeObjectURL(url)
+        // Check if we used streaming mode
+        const usedStreaming = fileStreams.current.has(fileId)
+        if (usedStreaming) {
+          fileStreams.current.delete(fileId)
+        }
 
+        if (usedStreaming && metadata) {
+          // For streaming mode, file is already saved
           updateTransfer(fileId, { progress: 100, status: "completed" })
 
           toast({
@@ -192,11 +234,11 @@ export function useFileTransfer(roomId: string) {
             description: `${metadata.name} downloaded successfully`,
           })
         } else {
-          // Add a fallback in case metadata was somehow missing
+          // Streaming mode should always be used now
           updateTransfer(fileId, { status: "failed" })
           toast({
             title: "Download failed",
-            description: "Failed to assemble received file.",
+            description: "Failed to complete file transfer.",
             variant: "destructive",
           })
         }
