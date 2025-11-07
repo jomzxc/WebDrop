@@ -32,22 +32,22 @@ Before contributing, ensure you have:
 1. **Fork the repository** on GitHub
 
 2. **Clone your fork**:
-   \`\`\`bash
+   ```bash
    git clone https://github.com/YOUR-USERNAME/WebDrop.git
    cd WebDrop
-   \`\`\`
+   ```
 
 3. **Add upstream remote**:
-   \`\`\`bash
+   ```bash
    git remote add upstream https://github.com/jomzxc/WebDrop.git
-   \`\`\`
+   ```
 
 4. **Install dependencies**:
-   \`\`\`bash
+   ```bash
    npm install --legacy-peer-deps
    # or
    pnpm install
-   \`\`\`
+   ```
 
 5. **Set up Supabase**:
    - Create a new Supabase project
@@ -55,16 +55,16 @@ Before contributing, ensure you have:
    - Configure authentication providers as needed
 
 6. **Configure environment variables**:
-   \`\`\`bash
+   ```bash
    # Create .env.local file
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   \`\`\`
+   ```
 
 7. **Start the development server**:
-   \`\`\`bash
+   ```bash
    npm run dev
-   \`\`\`
+   ```
 
 ---
 
@@ -81,7 +81,7 @@ Before contributing, ensure you have:
 
 Familiarize yourself with the codebase structure:
 
-\`\`\`
+```
 WebDrop/
 ├── app/                    # Next.js App Router pages and routes
 ├── components/             # Reusable React components
@@ -93,7 +93,7 @@ WebDrop/
 │   └── types/              # TypeScript type definitions
 ├── scripts/                # Database migration SQL scripts
 └── public/                 # Static assets
-\`\`\`
+```
 
 ### Key Technologies to Understand
 
@@ -133,7 +133,7 @@ WebDrop/
 - **Use type aliases** for unions, intersections, or utility types
 
 Example:
-\`\`\`typescript
+```typescript
 interface User {
   id: string
   username: string
@@ -143,11 +143,11 @@ interface User {
 async function updateUsername(userId: string, newUsername: string): Promise<void> {
   // implementation
 }
-\`\`\`
+```
 
 ### React Component Style
 
-\`\`\`typescript
+```typescript
 "use client" // Only when needed (for client components)
 
 import { useState } from "react"
@@ -168,7 +168,7 @@ export function MyComponent({ title, onSubmit }: MyComponentProps) {
     </div>
   )
 }
-\`\`\`
+```
 
 ### Formatting
 
@@ -200,21 +200,21 @@ Use descriptive branch names with prefixes:
 - `chore/` – Maintenance tasks (e.g., `chore/update-dependencies`)
 
 Example:
-\`\`\`bash
+```bash
 git checkout -b feature/add-file-preview
-\`\`\`
+```
 
 ### Commit Messages
 
 Follow conventional commit format:
 
-\`\`\`
+```
 <type>(<scope>): <subject>
 
 <body (optional)>
 
 <footer (optional)>
-\`\`\`
+```
 
 **Types:**
 - `feat` – New feature
@@ -227,23 +227,23 @@ Follow conventional commit format:
 - `chore` – Maintenance tasks (dependencies, config, etc.)
 
 **Examples:**
-\`\`\`bash
+```bash
 git commit -m "feat(room): add file preview before sending"
 git commit -m "fix(auth): resolve GitHub OAuth callback error"
 git commit -m "docs: update installation instructions"
 git commit -m "refactor(webrtc): simplify signaling logic"
-\`\`\`
+```
 
 ### Keeping Your Fork Updated
 
 Regularly sync with the upstream repository:
 
-\`\`\`bash
+```bash
 git fetch upstream
 git checkout main
 git merge upstream/main
 git push origin main
-\`\`\`
+```
 
 ---
 
@@ -312,9 +312,9 @@ Before submitting a PR, manually test:
 ### Creating a Pull Request
 
 1. **Push your branch** to your fork:
-   \`\`\`bash
+   ```bash
    git push origin feature/your-feature-name
-   \`\`\`
+   ```
 
 2. **Open a PR** on GitHub from your fork to `jomzxc/WebDrop:main`
 
@@ -326,18 +326,18 @@ Before submitting a PR, manually test:
    - Screenshots (if UI changes)
 
 4. **Link related issues** (if applicable):
-   \`\`\`
+   ```
    Closes #123
    Fixes #456
-   \`\`\`
+   ```
 
 ### PR Title Format
 
 Use conventional commit format:
-\`\`\`
+```
 feat(room): add file preview before sending
 fix(auth): resolve GitHub OAuth callback error
-\`\`\`
+```
 
 ### PR Review Process
 

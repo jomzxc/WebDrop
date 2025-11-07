@@ -124,7 +124,7 @@
   body {
     @apply bg-background text-foreground;
   }
-
+  
   /* Dynamic cursor styles for interactive elements */
   button,
   a,
@@ -140,7 +140,7 @@
   input[type="file"]::file-selector-button {
     @apply cursor-pointer;
   }
-
+  
   button:disabled,
   a[aria-disabled="true"],
   [role="button"][aria-disabled="true"],
@@ -151,7 +151,7 @@
   input:disabled {
     @apply cursor-not-allowed;
   }
-
+  
   input[type="text"],
   input[type="email"],
   input[type="password"],
@@ -162,7 +162,7 @@
   textarea {
     @apply cursor-text;
   }
-
+  
   input[type="text"]:disabled,
   input[type="email"]:disabled,
   input[type="password"]:disabled,
