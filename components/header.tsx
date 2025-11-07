@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Moon, Sun, User, LogOut } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -20,8 +20,24 @@ export default function Header() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const isInitialLoadRef = useRef(true)
   const router = useRouter()
   const supabase = createClient()
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
+      console.log("[v0] Header - Profile data:", data)
+      console.log("[v0] Header - Avatar URL:", data?.avatar_url)
+      setProfile(data)
+    } catch (error) {
+      console.error("[v0] Header - Error fetching profile:", error)
+    } finally {
+      setAuthLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -37,15 +53,34 @@ export default function Header() {
 
     window.addEventListener("storage", handleStorageChange)
 
+    // Get initial auth state
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (isInitialLoadRef.current) {
+        setUser(user ?? null)
+        if (user) {
+          fetchProfile(user.id)
+        } else {
+          setAuthLoading(false)
+        }
+      }
+    }).catch(() => {
+      if (isInitialLoadRef.current) {
+        setAuthLoading(false)
+      }
+    })
+
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      isInitialLoadRef.current = false
       setUser(session?.user ?? null)
       if (session?.user) {
+        setAuthLoading(true)
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
+        setAuthLoading(false)
       }
     })
 
@@ -53,14 +88,8 @@ export default function Header() {
       window.removeEventListener("storage", handleStorageChange)
       subscription.unsubscribe()
     }
-  }, [supabase]) // Added supabase to dependency array
-
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
-    console.log("[v0] Header - Profile data:", data)
-    console.log("[v0] Header - Avatar URL:", data?.avatar_url)
-    setProfile(data)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toggleDarkMode = () => {
     if (mounted) {
@@ -106,7 +135,11 @@ export default function Header() {
               {mounted && isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            {user ? (
+            {authLoading ? (
+              <div className="h-10 w-10 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
