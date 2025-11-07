@@ -16,7 +16,7 @@ export interface Transfer {
   peerName?: string
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024 // 2GB
+const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 
 export function useFileTransfer(roomId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([])

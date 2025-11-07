@@ -9,7 +9,7 @@ WebDrop enables high-speed, direct file transfers between browsers without uploa
 ## ✨ Features
 
 - **True Peer-to-Peer Transfer** – Files are sent directly between users using encrypted WebRTC data channels. No files touch our servers.
-- **Memory-Efficient Streaming** – Files are streamed directly to disk in modern browsers, eliminating memory issues even with large files up to 2GB.
+- **Memory-Efficient Streaming** – Files are streamed directly to disk in modern browsers, eliminating memory issues even with large files up to 500MB.
 - **Room-Based Connections** – Create or join private rooms using an 8-character room ID.
 - **Real-Time Presence** – See who's online in your room with live status updates (Connecting, Live, Offline).
 - **Secure Authentication** – Sign up and log in securely using Email or GitHub OAuth.
@@ -232,23 +232,22 @@ WebDrop/
 
 WebDrop uses advanced streaming technology to efficiently handle large files:
 
-**Default limit:** 2GB per file
+**Default limit:** 500MB per file
 
 ### Streaming Mode (Modern Browsers)
 In Chrome/Edge 86+ and Safari 15.2+, files are **streamed directly to disk** using the File System Access API:
 - **Zero memory overhead** – chunks are written to disk as they arrive
 - Users choose save location before transfer starts
 - Memory usage remains constant regardless of file size
-- Perfect for large files up to 2GB
+- Perfect for large files up to 500MB
 
 ### Buffering Mode (Fallback)
 For older browsers, files are buffered in memory before download:
 - Works on all modern browsers
 - Automatic fallback when streaming is unavailable
 - Enhanced error detection for incomplete transfers
-- Recommended to keep files under 500MB to avoid memory issues on low-end devices
 
-The limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant. The 2GB limit works reliably with streaming mode, while buffering mode may encounter memory constraints with very large files.
+The limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant. You can increase it if needed, especially when using streaming mode.
 
 ---
 
