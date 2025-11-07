@@ -276,16 +276,15 @@ export default function RoomPage() {
             }
 
             if (isInitiator) {
-              setTimeout(() => {
-                pc.createOffer().catch((error) => {
-                  console.error("Failed to create offer:", error)
-                  toast({
-                    title: "Connection failed",
-                    description: "Could not establish peer connection",
-                    variant: "destructive",
-                  })
+              // Create offer immediately - no artificial delay needed
+              pc.createOffer().catch((error) => {
+                console.error("Failed to create offer:", error)
+                toast({
+                  title: "Connection failed",
+                  description: "Could not establish peer connection",
+                  variant: "destructive",
                 })
-              }, 500)
+              })
             }
           }
         }
@@ -385,9 +384,15 @@ export default function RoomPage() {
       }
 
       Array.from(files).forEach((file) => {
-        sendFile(file, peerId, peer.username, (data) => {
-          connection.sendData(data)
-        })
+        sendFile(
+          file, 
+          peerId, 
+          peer.username, 
+          (data) => {
+            connection.sendData(data)
+          },
+          () => connection.getBufferedAmount()
+        )
       })
     },
     [toast, sendFile],

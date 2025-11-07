@@ -1,4 +1,5 @@
 const CHUNK_SIZE = 16384 // 16KB chunks
+const MAX_BUFFERED_AMOUNT = 16 * 1024 * 1024 // 16MB buffer threshold
 
 export interface FileMetadata {
   name: string
@@ -29,6 +30,7 @@ export class FileTransferManager {
     peerId: string,
     sendData: (data: any) => void,
     onProgress: (progress: number) => void,
+    getBufferedAmount?: () => number,
   ): Promise<void> {
     const fileId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
     const metadata: FileMetadata = {
@@ -50,17 +52,25 @@ export class FileTransferManager {
     let sentChunks = 0
 
     for (let i = 0; i < totalChunks; i++) {
+      // Wait if the buffer is too full to prevent memory issues
+      if (getBufferedAmount) {
+        while (getBufferedAmount() > MAX_BUFFERED_AMOUNT) {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+      }
+
       const start = i * CHUNK_SIZE
       const end = Math.min(start + CHUNK_SIZE, file.size)
       const chunk = file.slice(start, end)
       const arrayBuffer = await chunk.arrayBuffer()
 
+      // Send ArrayBuffer directly - avoid expensive Array conversion
       sendData({
         type: "file-chunk",
         chunk: {
           id: fileId,
           index: i,
-          data: Array.from(new Uint8Array(arrayBuffer)),
+          data: arrayBuffer,
           total: totalChunks,
         },
         peerId,
@@ -68,9 +78,6 @@ export class FileTransferManager {
 
       sentChunks++
       onProgress((sentChunks / totalChunks) * 100)
-
-      // Small delay to prevent overwhelming the connection
-      await new Promise((resolve) => setTimeout(resolve, 10))
     }
 
     sendData({
@@ -92,8 +99,8 @@ export class FileTransferManager {
     const transfer = this.pendingTransfers.get(chunk.id)
     if (!transfer) return
 
-    // Convert array back to ArrayBuffer
-    const arrayBuffer = new Uint8Array(chunk.data).buffer
+    // Data is already an ArrayBuffer - no conversion needed
+    const arrayBuffer = chunk.data instanceof ArrayBuffer ? chunk.data : new Uint8Array(chunk.data).buffer
     transfer.chunks[chunk.index] = arrayBuffer
     transfer.receivedChunks++
 
