@@ -148,12 +148,7 @@ export class FileTransferManager {
       transfer.chunks.set(chunk.index, arrayBuffer)
       
       // Write all sequential chunks starting from receivedChunks
-      while (transfer.chunks.has(transfer.receivedChunks)) {
-        const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
-        await transfer.writer.write(new Uint8Array(nextChunk))
-        transfer.chunks.delete(transfer.receivedChunks)
-        transfer.receivedChunks++
-      }
+      await this.writeSequentialChunks(transfer)
     } catch (error) {
       console.error("Error writing chunk to stream:", error)
       throw error
@@ -169,6 +164,22 @@ export class FileTransferManager {
     }
     
     onProgress(chunk.id, progress)
+  }
+
+  private async writeSequentialChunks(transfer: {
+    metadata: FileMetadata
+    writer: WritableStreamDefaultWriter<Uint8Array>
+    receivedChunks: number
+    totalChunks: number
+    chunks: Map<number, ArrayBuffer>
+  }): Promise<void> {
+    // Write all sequential chunks starting from receivedChunks
+    while (transfer.chunks.has(transfer.receivedChunks)) {
+      const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
+      await transfer.writer.write(new Uint8Array(nextChunk))
+      transfer.chunks.delete(transfer.receivedChunks)
+      transfer.receivedChunks++
+    }
   }
 
   async completeTransfer(fileId: string): Promise<void> {
@@ -200,12 +211,10 @@ export class FileTransferManager {
     // Process any remaining buffered chunks that arrived out of order
     // This handles chunks that were buffered but couldn't be written yet
     try {
-      while (transfer.chunks.has(transfer.receivedChunks)) {
-        const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
-        await transfer.writer.write(new Uint8Array(nextChunk))
-        transfer.chunks.delete(transfer.receivedChunks)
-        transfer.receivedChunks++
-        console.log(`[completeTransfer] Wrote buffered chunk ${transfer.receivedChunks - 1}`)
+      const chunksBeforeWrite = transfer.chunks.size
+      await this.writeSequentialChunks(transfer)
+      if (chunksBeforeWrite > 0) {
+        console.log(`[completeTransfer] Wrote ${chunksBeforeWrite} buffered chunks`)
       }
     } catch (error) {
       console.error("Error writing buffered chunks:", error)
