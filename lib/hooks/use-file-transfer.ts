@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import { FileTransferManager } from "@/lib/webrtc/file-transfer"
+import { FileTransferManager, type FileMetadata } from "@/lib/webrtc/file-transfer"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
@@ -17,7 +17,7 @@ export interface Transfer {
 }
 
 export interface PendingFileTransfer {
-  metadata: any
+  metadata: FileMetadata
   peerName: string
   sendAck: (data: any) => void
 }
@@ -126,7 +126,7 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileMetadata = useCallback(
-    async (metadata: any, peerName: string, sendAck: (data: any) => void) => {
+    async (metadata: FileMetadata, peerName: string, sendAck: (data: any) => void) => {
       if (!metadata?.id || !metadata?.name || !metadata?.size) {
         toast({
           title: "Invalid file metadata",
@@ -277,7 +277,11 @@ export function useFileTransfer(roomId: string) {
           const { file, sendData, getBufferedAmount } = pendingSend
 
           try {
-            await transferManager.current.sendFile(file, "", sendData, (progress) => {
+            // Get the transfer to retrieve peerId
+            const transfer = transfers.find(t => t.id === ack.fileId)
+            const peerId = transfer?.peerId || ""
+
+            await transferManager.current.sendFile(file, peerId, sendData, (progress) => {
               updateTransfer(ack.fileId, { progress, status: "transferring" })
             }, getBufferedAmount)
 
@@ -309,7 +313,7 @@ export function useFileTransfer(roomId: string) {
         })
       }
     },
-    [updateTransfer, toast],
+    [updateTransfer, toast, transfers],
   )
 
   const handleTransferComplete = useCallback(
