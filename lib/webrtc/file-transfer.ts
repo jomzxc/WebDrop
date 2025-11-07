@@ -106,8 +106,8 @@ export class FileTransferManager {
     // Data is already an ArrayBuffer - no conversion needed
     const arrayBuffer = chunk.data instanceof ArrayBuffer ? chunk.data : new Uint8Array(chunk.data).buffer
     
-    // Store total chunks from first chunk
-    if (transfer.totalChunks === 0) {
+    // Store total chunks (can be set from any chunk, not just the first one)
+    if (transfer.totalChunks === 0 && chunk.total > 0) {
       transfer.totalChunks = chunk.total
     }
 
@@ -157,9 +157,13 @@ export class FileTransferManager {
     const chunksArray: ArrayBuffer[] = []
     for (let i = 0; i < transfer.totalChunks; i++) {
       const chunk = transfer.chunks.get(i)
-      if (chunk) {
-        chunksArray.push(chunk)
+      if (!chunk) {
+        // Missing chunk - file is incomplete
+        console.error(`Missing chunk ${i} of ${transfer.totalChunks}`)
+        this.pendingTransfers.delete(fileId)
+        throw new Error(`File transfer incomplete: missing chunk ${i}`)
       }
+      chunksArray.push(chunk)
     }
     const blob = new Blob(chunksArray, { type: transfer.metadata.type })
     this.pendingTransfers.delete(fileId)

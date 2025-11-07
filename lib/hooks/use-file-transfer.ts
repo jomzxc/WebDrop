@@ -136,12 +136,12 @@ export function useFileTransfer(roomId: string) {
         // Check if showSaveFilePicker is available (modern browsers)
         if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
           // Use File System Access API for streaming
-          const fileHandle = await (window as any).showSaveFilePicker({
+          const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
             suggestedName: metadata.name,
             types: [
               {
                 description: "Files",
-                accept: { [metadata.type || "application/octet-stream"]: [] },
+                accept: { "*/*": [] },
               },
             ],
           })
