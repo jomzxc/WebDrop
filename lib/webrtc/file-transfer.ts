@@ -197,13 +197,32 @@ export class FileTransferManager {
 
     console.log(`[completeTransfer] All chunks received. Received: ${transfer.receivedChunks}, Total: ${transfer.totalChunks}`)
 
-    // Wait for any buffered chunks to be written (separate timeout)
+    // Process any remaining buffered chunks that arrived out of order
+    // This handles chunks that were buffered but couldn't be written yet
+    try {
+      while (transfer.chunks.has(transfer.receivedChunks)) {
+        const nextChunk = transfer.chunks.get(transfer.receivedChunks)!
+        await transfer.writer.write(new Uint8Array(nextChunk))
+        transfer.chunks.delete(transfer.receivedChunks)
+        transfer.receivedChunks++
+        console.log(`[completeTransfer] Wrote buffered chunk ${transfer.receivedChunks - 1}`)
+      }
+    } catch (error) {
+      console.error("Error writing buffered chunks:", error)
+    }
+
+    // Wait for any remaining buffered chunks to be written (separate timeout)
+    // This should now be 0 since we processed them above, but keep as safety check
     startTime = Date.now()
     waitTime = 50
     
     while (transfer.chunks.size > 0) {
       if (Date.now() - startTime > maxWaitTime) {
         console.error(`Timeout waiting for buffered chunks. Remaining: ${transfer.chunks.size}`)
+        // Log which chunks are stuck
+        const stuckChunks = Array.from(transfer.chunks.keys()).sort((a, b) => a - b)
+        console.error(`Stuck chunk indices: ${stuckChunks.join(', ')}`)
+        console.error(`Expected next chunk index: ${transfer.receivedChunks}`)
         break
       }
       // Exponential backoff to reduce CPU usage
