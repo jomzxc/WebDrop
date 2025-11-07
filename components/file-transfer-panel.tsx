@@ -191,7 +191,7 @@ export default function FileTransferPanel({
                       )}
                       <p className="text-sm font-bold text-accent min-w-12 text-right">
                         {transfer.status === "waiting-for-acceptance" 
-                          ? "Wait" 
+                          ? "Waiting" 
                           : `${Math.round(transfer.progress)}%`}
                       </p>
                     </div>

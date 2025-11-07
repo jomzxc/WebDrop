@@ -153,7 +153,7 @@ export function useFileTransfer(roomId: string) {
       if (typeof window === "undefined" || !("showSaveFilePicker" in window)) {
         toast({
           title: "Browser not supported",
-          description: "Your browser doesn't support file streaming. Please use Chrome 86+, Edge 86+, or Safari 15.2+ to receive files.",
+          description: "Your browser doesn't support file streaming. Please use Chrome 86+, Edge 86+, or Safari 15.4+ to receive files.",
           variant: "destructive",
         })
         sendAck({
@@ -332,14 +332,34 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleTransferComplete = useCallback(
-    (fileId: string) => {
+    async (fileId: string) => {
       updateTransfer(fileId, { status: "completed" })
       toast({
         title: "Transfer complete",
         description: "File successfully received by recipient",
       })
+
+      // Update database record to mark as completed
+      const transfer = transfers.find(t => t.id === fileId)
+      if (transfer) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.from("file_transfers")
+            .update({ 
+              status: "completed", 
+              completed_at: new Date().toISOString() 
+            })
+            .match({ 
+              room_id: roomId, 
+              sender_id: user.id,
+              file_name: transfer.fileName 
+            })
+        }
+      }
     },
-    [updateTransfer, toast],
+    [updateTransfer, toast, transfers, roomId, supabase],
   )
 
   return {

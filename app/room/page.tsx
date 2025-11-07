@@ -395,7 +395,7 @@ export default function RoomPage() {
       if (typeof window === "undefined" || !("showSaveFilePicker" in window)) {
         toast({
           title: "Browser not supported",
-          description: "Your browser doesn't support modern file transfers. Please use Chrome 86+, Edge 86+, or Safari 15.2+.",
+          description: "Your browser doesn't support modern file transfers. Please use Chrome 86+, Edge 86+, or Safari 15.4+.",
           variant: "destructive",
         })
         return
