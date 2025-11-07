@@ -27,8 +27,8 @@ export default function RoomPage() {
   const previousPeerIdsRef = useRef<Set<string>>(new Set())
   const pendingSignalsRef = useRef<Map<string, any[]>>(new Map())
   const peersRef = useRef<any[]>([])
-  const refreshPeersRef = useRef<() => Promise<void>>()
-  const createPeerConnectionRef = useRef<(peerId: string, username: string, isInitiator: boolean) => PeerConnection>()
+  const refreshPeersRef = useRef<(() => Promise<void>) | undefined>(undefined)
+  const createPeerConnectionRef = useRef<((peerId: string, username: string, isInitiator: boolean) => PeerConnection) | undefined>(undefined)
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
@@ -38,7 +38,7 @@ export default function RoomPage() {
   const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete, clearTransfers } =
     useFileTransfer(roomId)
 
-  const sendSignalRef = useRef<(toPeerId: string, signal: any) => Promise<void>>()
+  const sendSignalRef = useRef<((toPeerId: string, signal: any) => Promise<void>) | undefined>(undefined)
 
   useEffect(() => {
     const storedRoomId = sessionStorage.getItem("webdrop-roomId")
@@ -276,16 +276,15 @@ export default function RoomPage() {
             }
 
             if (isInitiator) {
-              setTimeout(() => {
-                pc.createOffer().catch((error) => {
-                  console.error("Failed to create offer:", error)
-                  toast({
-                    title: "Connection failed",
-                    description: "Could not establish peer connection",
-                    variant: "destructive",
-                  })
+              // Create offer immediately - no artificial delay needed
+              pc.createOffer().catch((error) => {
+                console.error("Failed to create offer:", error)
+                toast({
+                  title: "Connection failed",
+                  description: "Could not establish peer connection",
+                  variant: "destructive",
                 })
-              }, 500)
+              })
             }
           }
         }
@@ -385,9 +384,15 @@ export default function RoomPage() {
       }
 
       Array.from(files).forEach((file) => {
-        sendFile(file, peerId, peer.username, (data) => {
-          connection.sendData(data)
-        })
+        sendFile(
+          file, 
+          peerId, 
+          peer.username, 
+          (data) => {
+            connection.sendData(data)
+          },
+          () => connection.getBufferedAmount()
+        )
       })
     },
     [toast, sendFile],

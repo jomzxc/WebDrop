@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, Zap, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
@@ -14,52 +15,54 @@ interface PeerListProps {
   onlineUserIds: Set<string>
 }
 
+// Helper function to get initials - moved outside component to avoid recreation
+const getInitials = (name: string) => {
+  return name ? name.slice(0, 2).toUpperCase() : "P"
+}
+
+// Helper function to get status visuals - moved outside component to avoid recreation
+const getStatusVisuals = (state: string) => {
+  switch (state) {
+    case "connected":
+      return {
+        dot: "w-1.5 h-1.5 rounded-full bg-green-500",
+        text: "Connected",
+        badge: (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/15 border border-green-500/30 rounded-lg">
+            <Zap className="w-3.5 h-3.5 text-green-500" />
+            <span className="text-xs font-semibold text-green-600 dark:text-green-400">Live</span>
+          </div>
+        ),
+      }
+    case "connecting":
+    case "new":
+      return {
+        dot: "w-1.5 h-1.5 rounded-full bg-yellow-500",
+        text: "Connecting...",
+        badge: (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/15 border border-yellow-500/30 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 text-yellow-500 animate-spin" />
+            <span className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">Connecting</span>
+          </div>
+        ),
+      }
+    default: // 'disconnected', 'failed', 'closed', or any other state
+      return {
+        dot: "w-1.5 h-1.5 rounded-full bg-red-500",
+        text: "Offline", // Changed from Disconnected
+        badge: (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 rounded-lg">
+            <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+            <span className="text-xs font-semibold text-red-600 dark:text-red-400">Offline</span>
+          </div>
+        ),
+      }
+  }
+}
+
 export default function PeerList({ peers, onRefresh, connectionStates, currentUserId, onlineUserIds }: PeerListProps) {
-  const otherPeers = peers.filter((p) => p.user_id !== currentUserId)
-
-  // Helper function to get initials
-  const getInitials = (name: string) => {
-    return name ? name.slice(0, 2).toUpperCase() : "P"
-  }
-
-  const getStatusVisuals = (state: string) => {
-    switch (state) {
-      case "connected":
-        return {
-          dot: "w-1.5 h-1.5 rounded-full bg-green-500",
-          text: "Connected",
-          badge: (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/15 border border-green-500/30 rounded-lg">
-              <Zap className="w-3.5 h-3.5 text-green-500" />
-              <span className="text-xs font-semibold text-green-600 dark:text-green-400">Live</span>
-            </div>
-          ),
-        }
-      case "connecting":
-      case "new":
-        return {
-          dot: "w-1.5 h-1.5 rounded-full bg-yellow-500",
-          text: "Connecting...",
-          badge: (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/15 border border-yellow-500/30 rounded-lg">
-              <Loader2 className="w-3.5 h-3.5 text-yellow-500 animate-spin" />
-              <span className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">Connecting</span>
-            </div>
-          ),
-        }
-      default: // 'disconnected', 'failed', 'closed', or any other state
-        return {
-          dot: "w-1.5 h-1.5 rounded-full bg-red-500",
-          text: "Offline", // Changed from Disconnected
-          badge: (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 rounded-lg">
-              <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-              <span className="text-xs font-semibold text-red-600 dark:text-red-400">Offline</span>
-            </div>
-          ),
-        }
-    }
-  }
+  // Memoize filtered peers to avoid recalculation on every render
+  const otherPeers = useMemo(() => peers.filter((p) => p.user_id !== currentUserId), [peers, currentUserId])
 
   return (
     <Card className="p-8 space-y-6 backdrop-blur-xl border border-border/50 bg-card/40 shadow-2xl rounded-2xl overflow-hidden">

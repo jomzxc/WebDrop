@@ -19,36 +19,29 @@ export function useRoom(roomId: string | null) {
     if (!roomId) return
 
     try {
+      // Fetch peers with profiles in a single optimized query using a join
       const { data: peersData, error: peersError } = await supabase
         .from("peers")
-        .select("*")
+        .select(`
+          *,
+          profiles!peers_user_id_fkey (
+            avatar_url
+          )
+        `)
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true })
 
       if (peersError) throw peersError
 
       if (peersData && peersData.length > 0) {
-        // Get unique user IDs from peers
-        const userIds = [...new Set(peersData.map((peer) => peer.user_id))]
-
-        // Fetch profiles for these users
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, avatar_url")
-          .in("id", userIds)
-
-        if (profilesError) {
-          console.error("Error fetching profiles:", profilesError)
-        }
-
-        // Create a map of user_id to avatar_url
-        const avatarMap = new Map(profilesData?.map((profile) => [profile.id, profile.avatar_url]) || [])
-
-        // Merge avatar_url into peer objects
-        const peersWithAvatars = peersData.map((peer) => ({
-          ...peer,
-          avatar_url: avatarMap.get(peer.user_id) || null,
-        }))
+        // Map the joined data to the expected format
+        const peersWithAvatars = peersData.map((peerData: any) => {
+          const { profiles, ...peer } = peerData
+          return {
+            ...peer,
+            avatar_url: profiles?.avatar_url || null,
+          }
+        })
 
         setPeers(peersWithAvatars)
       } else {
@@ -108,20 +101,29 @@ export function useRoom(roomId: string | null) {
         .on("presence", { event: "sync" }, () => {
           // 'sync' event fires when we first join, giving us the current state
           const state = channel!.presenceState()
-          const userIds = new Set(Object.keys(state))
-          setOnlineUserIds(userIds)
+          setOnlineUserIds(new Set(Object.keys(state)))
         })
         .on("presence", { event: "join" }, ({ newPresences }) => {
-          // A user came online
-          setOnlineUserIds((prev) => new Set([...prev, ...newPresences.map((p) => p.key)]))
+          // A user came online - optimize by only adding new IDs
+          const newIds = newPresences.map((p) => p.key)
+          if (newIds.length > 0) {
+            setOnlineUserIds((prev) => {
+              const next = new Set(prev)
+              newIds.forEach((id) => next.add(id))
+              return next
+            })
+          }
         })
         .on("presence", { event: "leave" }, ({ leftPresences }) => {
-          // A user went offline (closed tab, lost connection)
-          setOnlineUserIds((prev) => {
-            const next = new Set(prev)
-            leftPresences.forEach((p) => next.delete(p.key))
-            return next
-          })
+          // A user went offline - optimize by only removing left IDs
+          const leftIds = leftPresences.map((p) => p.key)
+          if (leftIds.length > 0) {
+            setOnlineUserIds((prev) => {
+              const next = new Set(prev)
+              leftIds.forEach((id) => next.delete(id))
+              return next
+            })
+          }
         })
 
       channel.subscribe(async (status, err) => {

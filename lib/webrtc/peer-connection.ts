@@ -5,6 +5,7 @@ export class PeerConnection {
   private onStateChangeCallback: ((state: string) => void) | null = null
   private onErrorCallback: ((error: Error) => void) | null = null
   private iceCandidateBuffer: RTCIceCandidateInit[] = []
+  private pendingBinaryMetadata: any = null
 
   constructor(
     private peerId: string,
@@ -86,8 +87,34 @@ export class PeerConnection {
 
     this.dataChannel.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data)
-        this.onDataCallback?.(data)
+        // Handle binary data (ArrayBuffer)
+        if (event.data instanceof ArrayBuffer) {
+          if (this.pendingBinaryMetadata) {
+            // Combine metadata with binary data
+            const completeData = {
+              ...this.pendingBinaryMetadata,
+              chunk: {
+                ...this.pendingBinaryMetadata.chunk,
+                data: event.data,
+              },
+            }
+            this.pendingBinaryMetadata = null
+            this.onDataCallback?.(completeData)
+          } else {
+            // Unexpected binary data - log error
+            console.error("Received binary data without metadata")
+            this.onErrorCallback?.(new Error("Received binary data without metadata"))
+          }
+        } else {
+          // Handle JSON messages
+          const data = JSON.parse(event.data)
+          if (data.hasBinaryData) {
+            // Store metadata, wait for next message with binary data
+            this.pendingBinaryMetadata = data
+          } else {
+            this.onDataCallback?.(data)
+          }
+        }
       } catch (error) {
         this.onErrorCallback?.(new Error("Failed to parse data channel message"))
       }
@@ -178,7 +205,25 @@ export class PeerConnection {
   sendData(data: any) {
     if (this.dataChannel && this.dataChannel.readyState === "open") {
       try {
-        this.dataChannel.send(JSON.stringify(data))
+        // Handle binary data (ArrayBuffer) separately from JSON
+        if (data.type === "file-chunk" && data.chunk?.data instanceof ArrayBuffer) {
+          // Send binary data with metadata header
+          const metadata = {
+            type: data.type,
+            chunk: {
+              id: data.chunk.id,
+              index: data.chunk.index,
+              total: data.chunk.total,
+            },
+            peerId: data.peerId,
+          }
+          // Send metadata as JSON first, then binary data follows
+          this.dataChannel.send(JSON.stringify({ ...metadata, hasBinaryData: true }))
+          this.dataChannel.send(data.chunk.data)
+        } else {
+          // Regular JSON messages
+          this.dataChannel.send(JSON.stringify(data))
+        }
       } catch (error) {
         this.onErrorCallback?.(new Error("Failed to send data"))
       }
@@ -206,6 +251,10 @@ export class PeerConnection {
 
   getConnectionState(): RTCPeerConnectionState {
     return this.pc.connectionState
+  }
+
+  getBufferedAmount(): number {
+    return this.dataChannel?.bufferedAmount || 0
   }
 
   isFullyConnected(): boolean {

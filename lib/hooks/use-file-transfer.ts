@@ -38,7 +38,7 @@ export function useFileTransfer(roomId: string) {
   }, [])
 
   const sendFile = useCallback(
-    async (file: File, peerId: string, peerName: string, sendData: (data: any) => void) => {
+    async (file: File, peerId: string, peerName: string, sendData: (data: any) => void, getBufferedAmount?: () => number) => {
       if (file.size > MAX_FILE_SIZE) {
         toast({
           title: "File too large",
@@ -73,7 +73,7 @@ export function useFileTransfer(roomId: string) {
       try {
         await transferManager.current.sendFile(file, peerId, sendData, (progress) => {
           updateTransfer(transferId, { progress })
-        })
+        }, getBufferedAmount)
 
         updateTransfer(transferId, { progress: 100, status: "completed" })
 
