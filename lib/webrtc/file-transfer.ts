@@ -83,6 +83,8 @@ export class FileTransferManager {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
     let sentChunks = 0
 
+    console.log(`[sendChunks] Starting to send ${totalChunks} chunks for file ${fileId}`)
+
     for (let i = 0; i < totalChunks; i++) {
       // Wait if the buffer is too full to prevent memory issues
       if (getBufferedAmount) {
@@ -110,7 +112,13 @@ export class FileTransferManager {
 
       sentChunks++
       onProgress((sentChunks / totalChunks) * 100)
+      
+      if (i % 50 === 0 || i === totalChunks - 1) {
+        console.log(`[sendChunks] Sent chunk ${i}/${totalChunks} for file ${fileId}`)
+      }
     }
+
+    console.log(`[sendChunks] All ${sentChunks} chunks sent for file ${fileId}`)
 
     sendData({
       type: "file-complete",
@@ -261,10 +269,29 @@ export class FileTransferManager {
 
     console.log(`[completeTransfer] All buffered chunks written. Buffered: ${transfer.chunks.size}`)
 
-    // If we still have buffered chunks after timeout, log final state
+    // If we still have buffered chunks after timeout, identify missing chunks
     if (transfer.chunks.size > 0) {
+      const stuckChunks = Array.from(transfer.chunks.keys()).sort((a, b) => a - b)
+      const allChunksReceived = new Set<number>()
+      
+      // Track which chunks we have
+      for (let i = 0; i < transfer.receivedChunks; i++) {
+        allChunksReceived.add(i)
+      }
+      stuckChunks.forEach(idx => allChunksReceived.add(idx))
+      
+      // Find missing chunks
+      const missingChunks: number[] = []
+      for (let i = 0; i < transfer.totalChunks; i++) {
+        if (!allChunksReceived.has(i)) {
+          missingChunks.push(i)
+        }
+      }
+      
       console.error(`[completeTransfer] WARNING: Closing file with ${transfer.chunks.size} chunks not written. File will be corrupted.`)
       console.error(`Written chunks: ${transfer.receivedChunks}/${transfer.totalChunks}`)
+      console.error(`Missing ${missingChunks.length} chunks: ${missingChunks.slice(0, 30).join(', ')}${missingChunks.length > 30 ? '...' : ''}`)
+      console.error(`These missing chunks prevent ${transfer.chunks.size} buffered chunks from being written.`)
     }
 
     // Close the writer - this should flush all data to disk
