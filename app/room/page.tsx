@@ -35,8 +35,19 @@ export default function RoomPage() {
   const { peers, onlineUserIds, isLoading, createRoom, joinRoom, leaveRoom, refreshPeers } = useRoom(
     connected ? roomId : null,
   )
-  const { transfers, sendFile, handleFileMetadata, handleFileChunk, handleFileComplete, handleFileAck, handleTransferComplete, clearTransfers } =
-    useFileTransfer(roomId)
+  const { 
+    transfers, 
+    pendingIncomingTransfer, 
+    sendFile, 
+    handleFileMetadata, 
+    handleFileChunk, 
+    handleFileComplete, 
+    handleFileAck, 
+    handleTransferComplete, 
+    clearTransfers,
+    acceptIncomingTransfer,
+    rejectIncomingTransfer,
+  } = useFileTransfer(roomId)
 
   const sendSignalRef = useRef<((toPeerId: string, signal: any) => Promise<void>) | undefined>(undefined)
 
@@ -477,6 +488,9 @@ export default function RoomPage() {
                       peers={peersRef.current}
                       onFileSelect={handleFileSelect}
                       currentUserId={user.id}
+                      pendingIncomingTransfer={pendingIncomingTransfer}
+                      onAcceptTransfer={acceptIncomingTransfer}
+                      onRejectTransfer={rejectIncomingTransfer}
                     />
                     <PeerList
                       peers={peersRef.current}

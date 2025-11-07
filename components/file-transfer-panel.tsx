@@ -5,10 +5,20 @@ import type React from "react"
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Upload, CheckCircle2, AlertCircle, Download, Send, X } from "lucide-react"
-import type { Transfer } from "@/lib/hooks/use-file-transfer"
+import { Upload, CheckCircle2, AlertCircle, Download, Send, X, FileDown } from "lucide-react"
+import type { Transfer, PendingFileTransfer } from "@/lib/hooks/use-file-transfer"
 import type { Peer } from "@/lib/types/database"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface FileTransferPanelProps {
   roomId: string
@@ -16,6 +26,9 @@ interface FileTransferPanelProps {
   peers: Peer[]
   onFileSelect: (files: FileList, peerId: string) => void
   currentUserId: string
+  pendingIncomingTransfer: PendingFileTransfer | null
+  onAcceptTransfer: () => void
+  onRejectTransfer: () => void
 }
 
 export default function FileTransferPanel({
@@ -24,6 +37,9 @@ export default function FileTransferPanel({
   peers,
   onFileSelect,
   currentUserId,
+  pendingIncomingTransfer,
+  onAcceptTransfer,
+  onRejectTransfer,
 }: FileTransferPanelProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedPeer, setSelectedPeer] = useState<string>("")
@@ -221,6 +237,37 @@ export default function FileTransferPanel({
           </div>
         )}
       </div>
+
+      {/* Incoming File Transfer Dialog */}
+      <AlertDialog open={!!pendingIncomingTransfer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FileDown className="w-5 h-5 text-primary" />
+              Incoming File Transfer
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                <span className="font-semibold text-foreground">{pendingIncomingTransfer?.peerName}</span> wants to
+                send you a file:
+              </p>
+              <div className="bg-muted/50 rounded-lg p-3 mt-2">
+                <p className="font-medium text-foreground">{pendingIncomingTransfer?.metadata?.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {pendingIncomingTransfer?.metadata?.size
+                    ? formatFileSize(pendingIncomingTransfer.metadata.size)
+                    : "Unknown size"}
+                </p>
+              </div>
+              <p className="text-sm mt-3">Do you want to accept this file?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onRejectTransfer}>Decline</AlertDialogCancel>
+            <AlertDialogAction onClick={onAcceptTransfer}>Accept</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

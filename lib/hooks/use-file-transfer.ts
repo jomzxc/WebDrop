@@ -16,12 +16,20 @@ export interface Transfer {
   peerName?: string
 }
 
+export interface PendingFileTransfer {
+  metadata: any
+  peerName: string
+  sendAck: (data: any) => void
+}
+
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024 // 2GB
 
 export function useFileTransfer(roomId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [pendingIncomingTransfer, setPendingIncomingTransfer] = useState<PendingFileTransfer | null>(null)
   const transferManager = useRef(new FileTransferManager())
   const fileStreams = useRef(new Map<string, WritableStream<Uint8Array>>())
+  const pendingSends = useRef(new Map<string, { file: File; sendData: (data: any) => void; getBufferedAmount?: () => number }>())
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -35,6 +43,8 @@ export function useFileTransfer(roomId: string) {
 
   const clearTransfers = useCallback(() => {
     setTransfers([])
+    setPendingIncomingTransfer(null)
+    pendingSends.current.clear()
     transferManager.current.clearPendingTransfers()
     fileStreams.current.clear()
   }, [])
@@ -61,6 +71,9 @@ export function useFileTransfer(roomId: string) {
 
       const transferId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
 
+      // Store the file for later sending when accepted
+      pendingSends.current.set(transferId, { file, sendData, getBufferedAmount })
+
       addTransfer({
         id: transferId,
         fileName: file.name,
@@ -72,20 +85,25 @@ export function useFileTransfer(roomId: string) {
         peerName,
       })
 
+      // Send only metadata first
+      sendData({
+        type: "file-metadata",
+        metadata: {
+          id: transferId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        },
+        peerId,
+      })
+
+      toast({
+        title: "File offer sent",
+        description: `Waiting for ${peerName} to accept ${file.name}`,
+      })
+
+      // Log to database
       try {
-        await transferManager.current.sendFile(file, peerId, sendData, (progress) => {
-          updateTransfer(transferId, { progress, status: "transferring" })
-        }, getBufferedAmount)
-
-        // Don't mark as completed yet - wait for receiver acknowledgment
-        updateTransfer(transferId, { progress: 100, status: "waiting-for-acceptance" })
-
-        toast({
-          title: "File sent",
-          description: `Waiting for ${peerName} to accept ${file.name}`,
-        })
-
-        // Log to database
         const {
           data: { user },
         } = await supabase.auth.getUser()
@@ -101,16 +119,10 @@ export function useFileTransfer(roomId: string) {
           })
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-        updateTransfer(transferId, { status: "failed" })
-        toast({
-          title: "Transfer failed",
-          description: errorMessage,
-          variant: "destructive",
-        })
+        console.error("Failed to log transfer to database:", error)
       }
     },
-    [addTransfer, updateTransfer, roomId, supabase, toast],
+    [addTransfer, roomId, supabase, toast],
   )
 
   const handleFileMetadata = useCallback(
@@ -167,75 +179,14 @@ export function useFileTransfer(roomId: string) {
         return
       }
 
-      try {
-        // Use File System Access API for streaming
-        const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
-          suggestedName: metadata.name,
-        })
-        const writableStream = await fileHandle.createWritable()
-        const writer = writableStream.getWriter()
-        
-        fileStreams.current.set(metadata.id, writableStream)
-        transferManager.current.receiveMetadata(metadata, writer)
-
-        addTransfer({
-          id: metadata.id,
-          fileName: metadata.name,
-          fileSize: metadata.size,
-          progress: 0,
-          status: "transferring",
-          direction: "receiving",
-          peerName,
-        })
-
-        // Send acknowledgment to sender
-        sendAck({
-          type: "file-ack",
-          ack: {
-            fileId: metadata.id,
-            accepted: true,
-          },
-        })
-
-        toast({
-          title: "Receiving file",
-          description: `${metadata.name} from ${peerName}`,
-        })
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          // User cancelled the file picker
-          toast({
-            title: "Transfer cancelled",
-            description: "File download was cancelled",
-            variant: "destructive",
-          })
-          sendAck({
-            type: "file-ack",
-            ack: {
-              fileId: metadata.id,
-              accepted: false,
-              reason: "User cancelled",
-            },
-          })
-        } else {
-          console.error("Error setting up file transfer:", error)
-          toast({
-            title: "Transfer error",
-            description: "Failed to set up file transfer",
-            variant: "destructive",
-          })
-          sendAck({
-            type: "file-ack",
-            ack: {
-              fileId: metadata.id,
-              accepted: false,
-              reason: "Failed to set up file transfer",
-            },
-          })
-        }
-      }
+      // Store the pending transfer and wait for user interaction
+      setPendingIncomingTransfer({
+        metadata,
+        peerName,
+        sendAck,
+      })
     },
-    [addTransfer, toast],
+    [toast],
   )
 
   const handleFileChunk = useCallback(
@@ -312,15 +263,45 @@ export function useFileTransfer(roomId: string) {
   )
 
   const handleFileAck = useCallback(
-    (ack: { fileId: string; accepted: boolean; reason?: string }) => {
+    async (ack: { fileId: string; accepted: boolean; reason?: string }) => {
       if (ack.accepted) {
         updateTransfer(ack.fileId, { status: "transferring" })
         toast({
           title: "Transfer accepted",
           description: "Recipient is downloading the file",
         })
+
+        // Now send the actual file chunks
+        const pendingSend = pendingSends.current.get(ack.fileId)
+        if (pendingSend) {
+          const { file, sendData, getBufferedAmount } = pendingSend
+
+          try {
+            await transferManager.current.sendFile(file, "", sendData, (progress) => {
+              updateTransfer(ack.fileId, { progress, status: "transferring" })
+            }, getBufferedAmount)
+
+            updateTransfer(ack.fileId, { progress: 100, status: "completed" })
+            pendingSends.current.delete(ack.fileId)
+
+            toast({
+              title: "File sent",
+              description: "File successfully sent",
+            })
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+            updateTransfer(ack.fileId, { status: "failed" })
+            pendingSends.current.delete(ack.fileId)
+            toast({
+              title: "Transfer failed",
+              description: errorMessage,
+              variant: "destructive",
+            })
+          }
+        }
       } else {
         updateTransfer(ack.fileId, { status: "rejected" })
+        pendingSends.current.delete(ack.fileId)
         toast({
           title: "Transfer rejected",
           description: ack.reason || "Recipient rejected the file",
@@ -362,8 +343,111 @@ export function useFileTransfer(roomId: string) {
     [updateTransfer, toast, transfers, roomId, supabase],
   )
 
+  const acceptIncomingTransfer = useCallback(async () => {
+    if (!pendingIncomingTransfer) return
+
+    const { metadata, peerName, sendAck } = pendingIncomingTransfer
+
+    try {
+      // Use File System Access API for streaming - this is now triggered by user gesture
+      const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
+        suggestedName: metadata.name,
+      })
+      const writableStream = await fileHandle.createWritable()
+      const writer = writableStream.getWriter()
+      
+      fileStreams.current.set(metadata.id, writableStream)
+      transferManager.current.receiveMetadata(metadata, writer)
+
+      addTransfer({
+        id: metadata.id,
+        fileName: metadata.name,
+        fileSize: metadata.size,
+        progress: 0,
+        status: "transferring",
+        direction: "receiving",
+        peerName,
+      })
+
+      // Send acknowledgment to sender
+      sendAck({
+        type: "file-ack",
+        ack: {
+          fileId: metadata.id,
+          accepted: true,
+        },
+      })
+
+      toast({
+        title: "Receiving file",
+        description: `${metadata.name} from ${peerName}`,
+      })
+
+      // Clear the pending transfer
+      setPendingIncomingTransfer(null)
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        // User cancelled the file picker
+        toast({
+          title: "Transfer cancelled",
+          description: "File download was cancelled",
+          variant: "destructive",
+        })
+        sendAck({
+          type: "file-ack",
+          ack: {
+            fileId: metadata.id,
+            accepted: false,
+            reason: "User cancelled",
+          },
+        })
+      } else {
+        console.error("Error setting up file transfer:", error)
+        toast({
+          title: "Transfer error",
+          description: "Failed to set up file transfer",
+          variant: "destructive",
+        })
+        sendAck({
+          type: "file-ack",
+          ack: {
+            fileId: metadata.id,
+            accepted: false,
+            reason: "Failed to set up file transfer",
+          },
+        })
+      }
+      // Clear the pending transfer on error
+      setPendingIncomingTransfer(null)
+    }
+  }, [pendingIncomingTransfer, addTransfer, toast])
+
+  const rejectIncomingTransfer = useCallback(() => {
+    if (!pendingIncomingTransfer) return
+
+    const { metadata, sendAck } = pendingIncomingTransfer
+
+    sendAck({
+      type: "file-ack",
+      ack: {
+        fileId: metadata.id,
+        accepted: false,
+        reason: "User declined",
+      },
+    })
+
+    toast({
+      title: "Transfer declined",
+      description: "File transfer was declined",
+    })
+
+    // Clear the pending transfer
+    setPendingIncomingTransfer(null)
+  }, [pendingIncomingTransfer, toast])
+
   return {
     transfers,
+    pendingIncomingTransfer,
     sendFile,
     handleFileMetadata,
     handleFileChunk,
@@ -371,5 +455,7 @@ export function useFileTransfer(roomId: string) {
     handleFileAck,
     handleTransferComplete,
     clearTransfers,
+    acceptIncomingTransfer,
+    rejectIncomingTransfer,
   }
 }
