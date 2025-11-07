@@ -211,6 +211,11 @@ export class PeerConnection {
     try {
       // Handle binary data (ArrayBuffer) separately from JSON
       if (data.type === "file-chunk" && data.chunk?.data instanceof ArrayBuffer) {
+        // Validate chunk data
+        if (!data.chunk.id || typeof data.chunk.index !== "number" || typeof data.chunk.total !== "number") {
+          throw new Error("Invalid chunk metadata")
+        }
+        
         // Send binary data with metadata header
         const metadata = {
           type: data.type,
@@ -232,8 +237,13 @@ export class PeerConnection {
           throw new Error(`Data channel closed after sending metadata (state: ${this.dataChannel.readyState})`)
         }
       } else {
-        // Regular JSON messages
-        this.dataChannel.send(JSON.stringify(data))
+        // Regular JSON messages - validate that data is serializable
+        try {
+          const jsonStr = JSON.stringify(data)
+          this.dataChannel.send(jsonStr)
+        } catch (jsonError) {
+          throw new Error(`Failed to serialize data: ${jsonError instanceof Error ? jsonError.message : "Unknown error"}`)
+        }
       }
     } catch (error) {
       // Preserve the actual error message for better debugging

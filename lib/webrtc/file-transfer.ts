@@ -2,6 +2,7 @@ const CHUNK_SIZE = 16384 // 16KB chunks
 const MAX_BUFFERED_AMOUNT = 16 * 1024 * 1024 // 16MB buffer threshold
 const BUFFER_CHECK_INTERVAL = 100 // Check every 100ms instead of 10ms to reduce CPU usage
 const POST_SEND_DELAY_MS = 10 // Small delay after sending to allow buffer to drain
+const MAX_BUFFER_WAIT_TIME = 30000 // Maximum 30 seconds to wait for buffer to drain
 
 export interface FileMetadata {
   name: string
@@ -26,6 +27,7 @@ export class FileTransferManager {
       receivedChunks: number
     }
   >()
+  private cancelledTransfers = new Set<string>()
 
   async sendFile(
     file: File,
@@ -54,16 +56,40 @@ export class FileTransferManager {
     let sentChunks = 0
 
     for (let i = 0; i < totalChunks; i++) {
+      // Check if transfer was cancelled
+      if (this.cancelledTransfers.has(fileId)) {
+        this.cancelledTransfers.delete(fileId)
+        throw new Error("Transfer cancelled")
+      }
+
       const start = i * CHUNK_SIZE
       const end = Math.min(start + CHUNK_SIZE, file.size)
       const chunk = file.slice(start, end)
-      const arrayBuffer = await chunk.arrayBuffer()
+      
+      let arrayBuffer: ArrayBuffer
+      try {
+        arrayBuffer = await chunk.arrayBuffer()
+      } catch (error) {
+        throw new Error(`Failed to read file chunk: ${error instanceof Error ? error.message : "Unknown error"}`)
+      }
 
       // Wait if the buffer is too full BEFORE sending
       // This prevents overwhelming the data channel buffer
       if (getBufferedAmount) {
         let bufferedAmount = getBufferedAmount()
+        const startWaitTime = Date.now()
         while (bufferedAmount > MAX_BUFFERED_AMOUNT) {
+          // Check for timeout to prevent infinite loop
+          if (Date.now() - startWaitTime > MAX_BUFFER_WAIT_TIME) {
+            throw new Error("Buffer wait timeout: data channel buffer not draining")
+          }
+          
+          // Check if transfer was cancelled
+          if (this.cancelledTransfers.has(fileId)) {
+            this.cancelledTransfers.delete(fileId)
+            throw new Error("Transfer cancelled")
+          }
+          
           // Use longer interval to avoid tight loop and excessive CPU usage
           await new Promise((resolve) => setTimeout(resolve, BUFFER_CHECK_INTERVAL))
           bufferedAmount = getBufferedAmount()
@@ -111,6 +137,12 @@ export class FileTransferManager {
     const transfer = this.pendingTransfers.get(chunk.id)
     if (!transfer) return
 
+    // Validate chunk index to prevent out-of-bounds access
+    if (chunk.index < 0 || chunk.index >= chunk.total) {
+      console.error(`Invalid chunk index ${chunk.index} for transfer ${chunk.id}`)
+      return
+    }
+
     // Data is already an ArrayBuffer - no conversion needed
     const arrayBuffer = chunk.data instanceof ArrayBuffer ? chunk.data : new Uint8Array(chunk.data).buffer
     transfer.chunks[chunk.index] = arrayBuffer
@@ -124,6 +156,23 @@ export class FileTransferManager {
     const transfer = this.pendingTransfers.get(fileId)
     if (!transfer) return null
 
+    // Verify all chunks were received to prevent corrupted file
+    const expectedChunks = Math.ceil(transfer.metadata.size / CHUNK_SIZE)
+    if (transfer.receivedChunks !== expectedChunks) {
+      console.error(`Incomplete transfer: received ${transfer.receivedChunks}/${expectedChunks} chunks`)
+      this.pendingTransfers.delete(fileId)
+      return null
+    }
+
+    // Verify no gaps in chunks array
+    for (let i = 0; i < expectedChunks; i++) {
+      if (!transfer.chunks[i]) {
+        console.error(`Missing chunk ${i} in transfer ${fileId}`)
+        this.pendingTransfers.delete(fileId)
+        return null
+      }
+    }
+
     // Combine all chunks
     const blob = new Blob(transfer.chunks, { type: transfer.metadata.type })
     this.pendingTransfers.delete(fileId)
@@ -136,10 +185,12 @@ export class FileTransferManager {
   }
 
   cancelTransfer(fileId: string) {
+    this.cancelledTransfers.add(fileId)
     this.pendingTransfers.delete(fileId)
   }
 
   clearPendingTransfers() {
     this.pendingTransfers.clear()
+    this.cancelledTransfers.clear()
   }
 }
