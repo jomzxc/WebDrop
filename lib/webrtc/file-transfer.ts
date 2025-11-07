@@ -199,6 +199,14 @@ export class FileTransferManager {
     while (transfer.receivedChunks < transfer.totalChunks) {
       if (Date.now() - startTime > maxWaitTime) {
         console.error(`Timeout waiting for chunks. Received ${transfer.receivedChunks}/${transfer.totalChunks}`)
+        // Log which chunks are missing (causing the gap)
+        const missingChunks: number[] = []
+        for (let i = transfer.receivedChunks; i < transfer.totalChunks; i++) {
+          if (!transfer.chunks.has(i)) {
+            missingChunks.push(i)
+          }
+        }
+        console.error(`Missing chunk indices that are blocking progress: ${missingChunks.slice(0, 20).join(', ')}${missingChunks.length > 20 ? '...' : ''}`)
         break
       }
       // Exponential backoff to reduce CPU usage
@@ -213,8 +221,9 @@ export class FileTransferManager {
     try {
       const chunksBeforeWrite = transfer.chunks.size
       await this.writeSequentialChunks(transfer)
-      if (chunksBeforeWrite > 0) {
-        console.log(`[completeTransfer] Wrote ${chunksBeforeWrite} buffered chunks`)
+      const chunksWritten = chunksBeforeWrite - transfer.chunks.size
+      if (chunksWritten > 0) {
+        console.log(`[completeTransfer] Wrote ${chunksWritten} buffered chunks`)
       }
     } catch (error) {
       console.error("Error writing buffered chunks:", error)
@@ -232,6 +241,17 @@ export class FileTransferManager {
         const stuckChunks = Array.from(transfer.chunks.keys()).sort((a, b) => a - b)
         console.error(`Stuck chunk indices: ${stuckChunks.join(', ')}`)
         console.error(`Expected next chunk index: ${transfer.receivedChunks}`)
+        
+        // Determine which chunks are missing that would unblock these stuck chunks
+        const missingThatBlockStuck: number[] = []
+        for (let i = 0; i < Math.min(...stuckChunks); i++) {
+          if (!transfer.chunks.has(i) && i >= transfer.receivedChunks) {
+            missingThatBlockStuck.push(i)
+          }
+        }
+        if (missingThatBlockStuck.length > 0) {
+          console.error(`Missing chunks blocking stuck chunks: ${missingThatBlockStuck.join(', ')}`)
+        }
         break
       }
       // Exponential backoff to reduce CPU usage
@@ -240,6 +260,12 @@ export class FileTransferManager {
     }
 
     console.log(`[completeTransfer] All buffered chunks written. Buffered: ${transfer.chunks.size}`)
+
+    // If we still have buffered chunks after timeout, log final state
+    if (transfer.chunks.size > 0) {
+      console.error(`[completeTransfer] WARNING: Closing file with ${transfer.chunks.size} chunks not written. File will be corrupted.`)
+      console.error(`Written chunks: ${transfer.receivedChunks}/${transfer.totalChunks}`)
+    }
 
     // Close the writer - this should flush all data to disk
     try {
