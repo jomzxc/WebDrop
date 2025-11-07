@@ -146,13 +146,6 @@ export function useFileTransfer(roomId: string) {
         // Use File System Access API for streaming
         const fileHandle = await (window as Window & typeof globalThis & { showSaveFilePicker: (options?: any) => Promise<any> }).showSaveFilePicker({
           suggestedName: metadata.name,
-          startIn: 'downloads',
-          types: [
-            {
-              description: "Files",
-              accept: { "*/*": [] },
-            },
-          ],
         })
         const writableStream = await fileHandle.createWritable()
         const writer = writableStream.getWriter()
@@ -217,6 +210,13 @@ export function useFileTransfer(roomId: string) {
       try {
         // Get metadata BEFORE completing the transfer (which deletes it)
         const metadata = transferManager.current.getMetadata(fileId)
+        
+        // Check if the transfer was ever started (if not, user likely cancelled or setup failed)
+        if (!metadata) {
+          // Transfer was never set up, don't show error (user already saw setup error/cancellation)
+          return
+        }
+        
         await transferManager.current.completeTransfer(fileId)
 
         // Check if we used streaming mode
@@ -225,7 +225,7 @@ export function useFileTransfer(roomId: string) {
           fileStreams.current.delete(fileId)
         }
 
-        if (usedStreaming && metadata) {
+        if (usedStreaming) {
           // For streaming mode, file is already saved
           updateTransfer(fileId, { progress: 100, status: "completed" })
 
