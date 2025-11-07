@@ -46,6 +46,8 @@ export default function Header() {
       } else {
         setAuthLoading(false)
       }
+    }).catch(() => {
+      setAuthLoading(false)
     })
 
     // Listen for auth changes
@@ -65,14 +67,19 @@ export default function Header() {
       window.removeEventListener("storage", handleStorageChange)
       subscription.unsubscribe()
     }
-  }, [supabase]) // Added supabase to dependency array
+  }, [])
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
-    console.log("[v0] Header - Profile data:", data)
-    console.log("[v0] Header - Avatar URL:", data?.avatar_url)
-    setProfile(data)
-    setAuthLoading(false)
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
+      console.log("[v0] Header - Profile data:", data)
+      console.log("[v0] Header - Avatar URL:", data?.avatar_url)
+      setProfile(data)
+    } catch (error) {
+      console.error("[v0] Header - Error fetching profile:", error)
+    } finally {
+      setAuthLoading(false)
+    }
   }
 
   const toggleDarkMode = () => {
