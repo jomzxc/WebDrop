@@ -9,13 +9,13 @@ WebDrop enables high-speed, direct file transfers between browsers without uploa
 ## ✨ Features
 
 - **True Peer-to-Peer Transfer** – Files are sent directly between users using encrypted WebRTC data channels. No files touch our servers.
-- **Memory-Efficient Streaming** – Files are streamed directly to disk in modern browsers, eliminating memory issues even with large files up to 500MB.
 - **Room-Based Connections** – Create or join private rooms using an 8-character room ID.
 - **Real-Time Presence** – See who's online in your room with live status updates (Connecting, Live, Offline).
 - **Secure Authentication** – Sign up and log in securely using Email or GitHub OAuth.
 - **Profile Management** – Update your username and profile picture with client-side image resizing.
 - **Custom Avatars** – Upload profile pictures stored securely in Supabase Storage.
 - **Robust Connection Handling** – Gracefully handles page refreshes, browser disconnects, and reconnections.
+- **File Size Support** – Transfer files up to 500MB (configurable limit to prevent memory issues).
 
 ---
 
@@ -45,7 +45,7 @@ WebDrop is built as a modern, serverless web application using Next.js and Supab
 2. **Room Creation/Join** – Users create a new room or join an existing one with a room ID.
 3. **Presence & Signaling** – Supabase Realtime manages user presence and broadcasts WebRTC signaling messages (offers, answers, ICE candidates).
 4. **WebRTC Connection** – Direct peer-to-peer connections are established between browsers.
-5. **File Transfer** – Files are chunked and sent over encrypted WebRTC data channels. In modern browsers, files are streamed directly to disk as they arrive, eliminating memory issues with large files.
+5. **File Transfer** – Files are chunked and sent over encrypted WebRTC data channels, then reassembled in the receiver's browser.
 
 **Signaling Flow:**
 ```
@@ -228,26 +228,16 @@ WebDrop/
 
 ---
 
-## 💾 File Transfer Technology
+## ⚠️ File Size Limits
 
-WebDrop uses advanced streaming technology to efficiently handle large files:
+Files are chunked and transferred peer-to-peer, then reassembled in the **receiver's browser memory (RAM)**.
 
 **Default limit:** 500MB per file
 
-### Streaming Mode (Modern Browsers)
-In Chrome/Edge 86+ and Safari 15.2+, files are **streamed directly to disk** using the File System Access API:
-- **Zero memory overhead** – chunks are written to disk as they arrive
-- Users choose save location before transfer starts
-- Memory usage remains constant regardless of file size
-- Perfect for large files up to 500MB
-
-### Buffering Mode (Fallback)
-For older browsers, files are buffered in memory before download:
-- Works on all modern browsers
-- Automatic fallback when streaming is unavailable
-- Enhanced error detection for incomplete transfers
-
-The limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant. You can increase it if needed, especially when using streaming mode.
+This limit is set in `lib/hooks/use-file-transfer.ts` as the `MAX_FILE_SIZE` constant. You can increase it, but be aware:
+- Larger files require more memory on the receiver's device
+- Low-memory devices may crash when receiving large files
+- Consider your users' typical device capabilities
 
 ---
 
