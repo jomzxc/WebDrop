@@ -14,9 +14,19 @@ jest.mock("@/lib/supabase/client", () => ({
 
 import { createClient } from "@/lib/supabase/client"
 
-function Harness({ roomId }: { roomId: string | null }) {
+function Harness({
+  roomId,
+  onReady,
+}: {
+  roomId: string | null
+  onReady: (api: ReturnType<typeof useRoom>) => void
+}) {
   const api = useRoom(roomId)
-  ;(globalThis as any).__roomApi = api
+
+  React.useEffect(() => {
+    onReady(api)
+  }, [api, onReady])
+
   return <div />
 }
 
@@ -73,8 +83,17 @@ describe("useRoom", () => {
   })
 
   test("joinRoom throws for invalid id length", async () => {
-    render(<Harness roomId={null} />)
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId={null}
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await expect(api.joinRoom("ABC")).rejects.toThrow(/8 characters/i)
   })
@@ -85,8 +104,17 @@ describe("useRoom", () => {
       json: async () => ({ room: { id: "ABCDEFGH" } }),
     })
 
-    render(<Harness roomId={null} />)
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId={null}
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     let id: string | undefined
     await act(async () => {
@@ -107,8 +135,17 @@ describe("useRoom", () => {
       json: async () => ({ error: "boom" }),
     })
 
-    render(<Harness roomId={null} />)
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId={null}
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await expect(api.createRoom()).rejects.toThrow(/failed to create room/i)
@@ -129,8 +166,17 @@ describe("useRoom", () => {
       json: async () => ({ room }),
     })
 
-    render(<Harness roomId={null} />)
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId={null}
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     let result: any
     await act(async () => {
@@ -151,8 +197,17 @@ describe("useRoom", () => {
       json: async () => ({ success: true }),
     })
 
-    render(<Harness roomId={null} />)
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId={null}
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await api.leaveRoom("ABCDEFGH")
@@ -203,18 +258,26 @@ describe("useRoom", () => {
       removeChannel,
     })
 
-    render(<Harness roomId="ROOM1" />)
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await flushPromises()
     })
 
     await waitFor(() => {
-      const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
       expect(api.peers.length).toBe(2)
     })
 
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
     expect(api.peers[0]).toEqual(
       expect.objectContaining({
         username: "Alice",
@@ -248,7 +311,17 @@ describe("useRoom", () => {
       removeChannel: jest.fn(),
     })
 
-    render(<Harness roomId="ROOM1" />)
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await flushPromises()
@@ -259,7 +332,6 @@ describe("useRoom", () => {
     })
 
     await waitFor(() => {
-      const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
       expect(api.onlineUserIds.has("me")).toBe(true)
       expect(api.onlineUserIds.has("u1")).toBe(true)
     })
@@ -269,7 +341,6 @@ describe("useRoom", () => {
     })
 
     await waitFor(() => {
-      const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
       expect(api.onlineUserIds.has("u2")).toBe(true)
     })
 
@@ -278,7 +349,6 @@ describe("useRoom", () => {
     })
 
     await waitFor(() => {
-      const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
       expect(api.onlineUserIds.has("u1")).toBe(false)
     })
   })
@@ -299,7 +369,17 @@ describe("useRoom", () => {
       removeChannel: jest.fn(),
     })
 
-    render(<Harness roomId="ROOM1" />)
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await flushPromises()
@@ -327,7 +407,17 @@ describe("useRoom", () => {
       removeChannel: jest.fn(),
     })
 
-    render(<Harness roomId="ROOM1" />)
+    let api!: ReturnType<typeof useRoom>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await flushPromises()
@@ -342,7 +432,6 @@ describe("useRoom", () => {
       )
     })
 
-    const api = (globalThis as any).__roomApi as ReturnType<typeof useRoom>
     expect(api.peers).toEqual([])
   })
 
@@ -363,7 +452,17 @@ describe("useRoom", () => {
       removeChannel,
     })
 
-    const { unmount } = render(<Harness roomId="ROOM1" />)
+    let api!: ReturnType<typeof useRoom>
+    const { unmount } = render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       await flushPromises()

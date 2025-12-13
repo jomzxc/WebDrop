@@ -15,9 +15,18 @@ jest.mock("@/lib/supabase/client", () => ({
 
 import { createClient } from "@/lib/supabase/client"
 
-function Harness({ roomId }: { roomId: string }) {
+function Harness({
+  roomId,
+  onReady,
+}: {
+  roomId: string
+  onReady: (api: ReturnType<typeof useFileTransfer>) => void
+}) {
   const api = useFileTransfer(roomId)
-  ;(globalThis as any).__fileTransferApi = api
+
+  React.useEffect(() => {
+    onReady(api)
+  }, [api, onReady])
 
   return (
     <div>
@@ -48,8 +57,17 @@ describe("useFileTransfer", () => {
   test("rejects files over MAX_FILE_SIZE", async () => {
     const sendSpy = jest.spyOn(FileTransferManager.prototype, "sendFile").mockResolvedValue(undefined)
 
-    render(<Harness roomId="ROOM1" />)
-    const api = (globalThis as any).__fileTransferApi as ReturnType<typeof useFileTransfer>
+    let api!: ReturnType<typeof useFileTransfer>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     const file = new File(["x"], "big.bin", { type: "application/octet-stream" })
     Object.defineProperty(file, "size", { value: 500 * 1024 * 1024 + 1 })
@@ -81,8 +99,17 @@ describe("useFileTransfer", () => {
       from,
     })
 
-    render(<Harness roomId="ROOM1" />)
-    const api = (globalThis as any).__fileTransferApi as ReturnType<typeof useFileTransfer>
+    let api!: ReturnType<typeof useFileTransfer>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     const file = new File(["hello"], "hello.txt", { type: "text/plain" })
 
@@ -114,8 +141,17 @@ describe("useFileTransfer", () => {
       .spyOn(FileTransferManager.prototype, "receiveMetadata")
       .mockImplementation(() => {})
 
-    render(<Harness roomId="ROOM1" />)
-    const api = (globalThis as any).__fileTransferApi as ReturnType<typeof useFileTransfer>
+    let api!: ReturnType<typeof useFileTransfer>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       api.handleFileMetadata({ id: "f1", name: "photo.png", size: 123 }, "Alice")
@@ -137,8 +173,17 @@ describe("useFileTransfer", () => {
 
     const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
 
-    render(<Harness roomId="ROOM1" />)
-    const api = (globalThis as any).__fileTransferApi as ReturnType<typeof useFileTransfer>
+    let api!: ReturnType<typeof useFileTransfer>
+    render(
+      <Harness
+        roomId="ROOM1"
+        onReady={(a) => {
+          api = a
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(api).toBeTruthy())
 
     await act(async () => {
       api.handleFileMetadata({ id: "f2", name: "a.txt", size: 2 }, "Alice")

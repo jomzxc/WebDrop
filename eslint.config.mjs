@@ -4,6 +4,16 @@ import nextTypeScript from "eslint-config-next/typescript";
 // Next 16's eslint-config-next already exports *flat config* arrays.
 // Keep this file tiny and explicit so `eslint .` works with ESLint v9.
 const config = [
+	{
+		name: "project/ignores",
+		ignores: [
+			"coverage/**",
+			"playwright-report/**",
+			"test-results/**",
+			".next/**",
+			"out/**",
+		],
+	},
 	...nextCoreWebVitals,
 	...nextTypeScript,
 	{
@@ -28,6 +38,7 @@ const config = [
 		files: [
 			"**/*.config.{js,cjs,mjs,ts}",
 			"jest.config.js",
+			"jest.polyfills.js",
 			"jest.setup.js",
 			"playwright.config.ts",
 			"next.config.*",

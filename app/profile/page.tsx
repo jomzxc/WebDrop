@@ -24,7 +24,7 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const [identities, setIdentities] = useState<any[]>([])
+  const [identities, setIdentities] = useState<UserIdentity[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -45,6 +45,7 @@ export default function ProfilePage() {
     }
 
     setUser(user)
+    setIdentities(user.identities || [])
 
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
@@ -382,7 +383,7 @@ export default function ProfilePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleUnlinkAccount(identity as UserIdentity)}
+                          onClick={() => handleUnlinkAccount(identity)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                         >
                           <Trash2 className="w-4 h-4" />
