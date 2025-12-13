@@ -42,6 +42,7 @@ export default function ProfilePage() {
 
     setUser(user)
     setIdentities(user.identities || [])
+    setIdentities(user.identities || [])
 
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
