@@ -125,10 +125,6 @@ export default function RoomPage() {
     }
   }
 
-  const sendSignal = useCallback((toPeerId: string, signal: any) => {
-    return sendSignalRef.current?.(toPeerId, signal) || Promise.resolve()
-  }, [])
-
   useEffect(() => {
     if (!connected || !user || !roomId) {
       setIsChannelReady(false)
@@ -227,7 +223,7 @@ export default function RoomPage() {
       signalingChannelRef.current = null
       supabase.removeChannel(channel)
     }
-  }, [connected, user, roomId])
+  }, [connected, user, roomId, supabase, peerConnectionStates])
 
   useEffect(() => {
     if (!connected || !user || !isChannelReady) {
@@ -307,14 +303,17 @@ export default function RoomPage() {
     return () => {
       clearTimeout(timer)
     }
-  }, [connected, user, isChannelReady, peers, toast, createPeerConnection])
+  }, [connected, user, isChannelReady, peers, toast, createPeerConnection, peerConnectionStates])
 
   useEffect(() => {
+    const peerConnections = peerConnectionsRef
+    const pendingSignals = pendingSignalsRef
+    
     return () => {
-      if (peerConnectionsRef.current.size > 0) {
-        peerConnectionsRef.current.forEach((conn) => conn.close())
+      if (peerConnections.current.size > 0) {
+        peerConnections.current.forEach((conn) => conn.close())
       }
-      pendingSignalsRef.current.clear()
+      pendingSignals.current.clear()
     }
   }, [])
 
@@ -454,7 +453,6 @@ export default function RoomPage() {
                 {connected ? (
                   <>
                     <FileTransferPanel
-                      roomId={roomId}
                       transfers={transfers}
                       peers={peersRef.current}
                       onFileSelect={handleFileSelect}

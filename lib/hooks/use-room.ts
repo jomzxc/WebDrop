@@ -92,7 +92,7 @@ export function useRoom(roomId: string | null) {
           table: "peers",
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => {
+        () => {
           fetchPeers()
         },
       )
@@ -251,7 +251,7 @@ export function useRoom(roomId: string | null) {
         title: "Left room",
         description: "Disconnected from room",
       })
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to leave room properly",

@@ -10,7 +10,6 @@ describe("FileTransferPanel", () => {
 
     const { container } = render(
       <FileTransferPanel
-        roomId="ROOM1"
         transfers={[]}
         peers={[
           { id: "p0", room_id: "r", user_id: "me", username: "Me", joined_at: "", last_seen: "", avatar_url: null } as any,
@@ -54,7 +53,6 @@ describe("FileTransferPanel", () => {
   test("renders transfers list with progress", () => {
     render(
       <FileTransferPanel
-        roomId="ROOM1"
         peers={[]}
         currentUserId="me"
         onFileSelect={jest.fn()}

@@ -115,12 +115,12 @@ export class PeerConnection {
             this.onDataCallback?.(data)
           }
         }
-      } catch (error) {
+      } catch {
         this.onErrorCallback?.(new Error("Failed to parse data channel message"))
       }
     }
 
-    this.dataChannel.onerror = (error) => {
+    this.dataChannel.onerror = () => {
       this.onErrorCallback?.(new Error("Data channel error"))
     }
 

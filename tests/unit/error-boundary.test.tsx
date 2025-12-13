@@ -7,7 +7,7 @@ describe("ErrorBoundary", () => {
   test("renders fallback UI when a child throws and reloads on click", async () => {
     const user = userEvent.setup()
 
-    function Boom() {
+    function Boom(): React.JSX.Element {
       throw new Error("boom")
     }
 
