@@ -3,6 +3,7 @@
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import type { UserIdentity } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,17 +36,15 @@ export default function ProfilePage() {
   }, [])
 
   const fetchUserData = async (forceRefresh = false) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getUser()
+    const user = data.user
 
-    if (!user) {
+    if (error || !user) {
       router.push("/auth/login")
       return
     }
 
     setUser(user)
-    setIdentities(user.identities || [])
 
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
@@ -89,9 +88,9 @@ export default function ProfilePage() {
     }
   }
 
-  const handleUnlinkAccount = async (identityId: string) => {
+  const handleUnlinkAccount = async (identity: UserIdentity) => {
     try {
-      const { error } = await supabase.auth.unlinkIdentity({ identity_id: identityId })
+      const { error } = await supabase.auth.unlinkIdentity(identity)
       if (error) throw error
       setMessage({ type: "success", text: "Account unlinked successfully!" })
       fetchUserData(true)
@@ -216,14 +215,11 @@ export default function ProfilePage() {
   const currentAvatar = profile?.avatar_url
 
   return (
-    <main className="min-h-screen bg-background text-foreground flex flex-col">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
-      </div>
+    <main className="relative min-h-screen bg-background text-foreground flex flex-col">
+      <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent/15 rounded-full blur-3xl opacity-20 animate-pulse" />
 
       <Header />
-
       <div className="relative z-10 flex-1 container mx-auto px-4 lg:px-8 py-12 lg:py-16">
         <div className="max-w-4xl mx-auto space-y-8">
           <div>
@@ -386,7 +382,7 @@ export default function ProfilePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleUnlinkAccount(identity.id)}
+                          onClick={() => handleUnlinkAccount(identity as UserIdentity)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                         >
                           <Trash2 className="w-4 h-4" />

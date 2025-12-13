@@ -1,0 +1,126 @@
+# .github/workflows/test.yml
+name: Testing Suite
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+# CI runs must not depend on real Supabase secrets. These placeholders prevent
+# client/server Supabase helpers from throwing during runtime (e.g. Playwright).
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run ESLint
+        run: pnpm run lint
+
+  type_check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run TypeScript Check
+        run: pnpm run type-check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Application
+        run: pnpm run build
+
+  unit_tests:
+    name: Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run Unit Tests & Coverage
+        run: pnpm run test:coverage
+
+  integration_tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run Integration Tests
+        run: pnpm run test:integration
+
+  e2e_tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+      - name: Run E2E Tests
+        run: pnpm run test:e2e
