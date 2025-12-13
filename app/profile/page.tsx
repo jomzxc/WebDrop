@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { UserIdentity } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
@@ -31,11 +31,7 @@ export default function ProfilePage() {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    fetchUserData()
-  }, [])
-
-  const fetchUserData = async (forceRefresh = false) => {
+  const fetchUserData = useCallback(async (forceRefresh = false) => {
     const { data, error } = await supabase.auth.getUser()
     const user = data.user
 
@@ -59,7 +55,11 @@ export default function ProfilePage() {
     if (forceRefresh) {
       router.refresh()
     }
-  }
+  }, [supabase, router])
+
+  useEffect(() => {
+    fetchUserData()
+  }, [fetchUserData])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
