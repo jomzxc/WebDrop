@@ -8,7 +8,6 @@ export default function DarkModeProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [isDark, setIsDark] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -16,16 +15,8 @@ export default function DarkModeProvider({
     const stored = localStorage.getItem("theme")
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
     const shouldBeDark = stored ? stored === "dark" : prefersDark
-    setIsDark(shouldBeDark)
     document.documentElement.classList.toggle("dark", shouldBeDark)
   }, [])
-
-  const toggleDarkMode = () => {
-    const newValue = !isDark
-    setIsDark(newValue)
-    localStorage.setItem("theme", newValue ? "dark" : "light")
-    document.documentElement.classList.toggle("dark", newValue)
-  }
 
   if (!isMounted) return <>{children}</>
 

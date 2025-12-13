@@ -5,6 +5,11 @@
       "dom.iterable",
       "esnext"
     ],
+    "types": [
+      "jest",
+      "node",
+      "@testing-library/jest-dom"
+    ],
     "allowJs": true,
     "target": "ES6",
     "skipLibCheck": true,
@@ -36,6 +41,7 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "playwright.config.ts"
   ]
 }

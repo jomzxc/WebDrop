@@ -17,7 +17,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# test artifacts
+/coverage/
+/playwright-report/
+/test-results/
+
 # env files (but keep .env.example)
+.env
+.env.*
+!.env.example
 .env*.local
 .env.local
 .env.development.local

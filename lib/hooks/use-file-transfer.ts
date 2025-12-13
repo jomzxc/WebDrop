@@ -156,7 +156,7 @@ export function useFileTransfer(roomId: string) {
         transferManager.current.receiveChunk(chunk, (fileId, progress) => {
           updateTransfer(fileId, { progress })
         })
-      } catch (error) {
+      } catch {
         toast({
           title: "Transfer error",
           description: "Failed to receive file chunk",

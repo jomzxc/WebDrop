@@ -79,7 +79,7 @@ export default function SignUpPage() {
     try {
       const redirectTo = `${window.location.origin}/auth/callback`
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,

@@ -11,7 +11,6 @@ import type { Peer } from "@/lib/types/database"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface FileTransferPanelProps {
-  roomId: string
   transfers: Transfer[]
   peers: Peer[]
   onFileSelect: (files: FileList, peerId: string) => void
@@ -19,7 +18,6 @@ interface FileTransferPanelProps {
 }
 
 export default function FileTransferPanel({
-  roomId,
   transfers,
   peers,
   onFileSelect,
